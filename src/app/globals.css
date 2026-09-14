@@ -1,0 +1,94 @@
+@import "tailwindcss";
+
+/*
+  Ulat design tokens — from the design handoff.
+  Fonts: Gabarito (display/headings/big numbers), Figtree (everything else).
+*/
+@theme {
+  --color-page: #efebe3; /* page background */
+  --color-canvas: #fbf9f5; /* app canvas */
+  --color-card: #ffffff;
+  --color-panel: #101d26; /* sidebar / dark panels */
+  --color-panel-hover: #16242f;
+
+  --color-ink: #22303c;
+  --color-sub: #5a6672; /* secondary text */
+  --color-muted: #7b8792;
+  --color-faint: #9aa3ab;
+  --color-disabled: #b8c0c6;
+
+  --color-line: #e8e2d6; /* borders */
+  --color-hairline: #f1ede5;
+
+  --color-teal: #0fa3a0;
+  --color-teal-text: #0b807e;
+  --color-amber: #f5b70a;
+  --color-amber-text: #8a6400;
+  --color-red: #d14b33;
+  --color-red-text: #b03a24;
+
+  --font-display: var(--font-gabarito), system-ui, sans-serif;
+  --font-body: var(--font-figtree), system-ui, sans-serif;
+
+  --shadow-card: 0 2px 10px rgba(34, 48, 60, 0.06);
+  --shadow-selected: 0 6px 16px rgba(15, 163, 160, 0.18);
+
+  --radius-card: 16px;
+  --radius-phone-card: 20px;
+}
+
+:root {
+  color-scheme: light;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background: var(--color-page);
+  color: var(--color-ink);
+  font-family: var(--font-body);
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Tint utilities used throughout the handoff */
+@utility bg-teal-tint-8 {
+  background-color: rgba(15, 163, 160, 0.08);
+}
+@utility bg-teal-tint-10 {
+  background-color: rgba(15, 163, 160, 0.1);
+}
+@utility bg-teal-tint-12 {
+  background-color: rgba(15, 163, 160, 0.12);
+}
+@utility bg-amber-tint {
+  background-color: rgba(245, 183, 10, 0.16);
+}
+@utility bg-red-tint-8 {
+  background-color: rgba(209, 75, 51, 0.08);
+}
+@utility bg-red-tint-12 {
+  background-color: rgba(209, 75, 51, 0.12);
+}
+@utility bg-inc-tint {
+  background-color: rgba(90, 102, 114, 0.14);
+}
+
+/* Uppercase label style: 11/700, 0.6px tracking */
+@utility label-caps {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+
+/* Hide scrollbars (carousel rows, gradebook helpers) */
+@utility no-scrollbar {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
