@@ -1,8 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { usePathname, useRouter } from "next/navigation";
-import { use } from "react";
+import { useParams, usePathname, useRouter } from "next/navigation";
 import { ConfirmDialogHost } from "@/components/ConfirmDialogHost";
 import { DEMO_INSTRUCTOR, headerMeta, initialsOf } from "@/lib/derive";
 import { useMounted, usePeriodComputed } from "@/lib/hooks";
@@ -19,14 +18,10 @@ const PAGES: [string, string][] = [
   ["settings", "Settings"],
 ];
 
-export default function ClassLayout({
-  children,
-  params,
-}: {
-  children: React.ReactNode;
-  params: Promise<{ clsId: string }>;
-}) {
-  const { clsId } = use(params);
+// This layout sits ABOVE the [clsId] segment so it survives class switches:
+// only the page content remounts, never the sidebar/header (no flash).
+export default function ClassLayout({ children }: { children: React.ReactNode }) {
+  const { clsId } = useParams<{ clsId: string }>();
   const router = useRouter();
   const pathname = usePathname();
   const mounted = useMounted();
