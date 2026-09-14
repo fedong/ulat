@@ -1,36 +1,51 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Ulat — Philippine Gradebook
 
-## Getting Started
+Instructors run classes on the web: define a grading system (weighted groups and
+components, transmutation, scale, passing line), record assessments and scores,
+take attendance, flag students for consultation, and control what students and
+guardians see. Students and guardians use a companion mobile app (planned).
 
-First, run the development server:
+Built from the high-fidelity design handoff in `design_handoff_ulat_web`
+(prototype `Ulat Web v2.dc.html`).
+
+## Stack
+
+- **Next.js** (App Router) + **TypeScript**
+- **Tailwind CSS v4** with the handoff's design tokens (`src/app/globals.css`)
+- **Zustand** for client state (seeded demo classes; an API/backend comes later)
+- Fonts: **Gabarito** (display) and **Figtree** (body) via `next/font`
+
+## Run
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open http://localhost:3000 — sign in with any email + password (demo auth), or
+"Continue with Google Workspace" to jump straight in.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Structure
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Path | What it is |
+| --- | --- |
+| `src/lib/grading.ts` | Grade math ported exactly from the prototype: `compute`, `periodOf`, `termOf`, `attRate`, transmutation, standing, outlook `simulate` |
+| `src/lib/presets.ts` | Grading-system presets (University, Lecture/Lab, DepEd WW/PT/QA, Letter GPA) |
+| `src/lib/seed.ts` | Demo classes CS101 and MTEC305A (seed content, not part of the design) |
+| `src/lib/store.ts` | Zustand store: classes, shared period state, save indicator, dialogs |
+| `src/app/signin` | Sign in / sign up split screen |
+| `src/app/c/[clsId]/…` | App shell (sidebar + header) and the seven class pages: overview, gradebook, assessments, attendance, students, sharing, settings |
+| `src/app/new` | Class wizard route (next milestone) |
 
-## Learn More
+## Status
 
-To learn more about Next.js, take a look at the following resources:
+Instructor web app pages are implemented against the handoff: Overview
+analytics, Gradebook with keyboard entry (arrows/Tab, digits, `m`/`e`, undo,
+closed periods), Assessments with archive + attendance-linked prefill,
+Attendance with P/L/A/E cycling linked to scores, Students with the full detail
+panel (record, work, remarks, shared view, flags), Sharing consent table, and
+Settings (grading editor, scale/passing, transmutation, periods, term grade,
+consultation hours, co-instructors, archive/delete).
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Next milestones: the 4-step class wizard (roster import/parsing), XLSX export,
+and the student/guardian mobile views.

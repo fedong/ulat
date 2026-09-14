@@ -114,7 +114,8 @@ export interface Klass {
   remarks: Record<string, string>;
   remarkLog?: Record<string, RemarkEntry[]>;
   flags?: Record<string, boolean>;
-  consults?: Record<string, boolean>;
+  /** Student id → timestamp of the last consultation, when marked. */
+  consults?: Record<string, number | null | undefined>;
   consult: { slots: ConsultSlot[]; note: string };
   team?: TeamMember[];
   archived?: boolean;
