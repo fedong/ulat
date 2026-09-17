@@ -244,13 +244,17 @@ export default function OverviewPage({ params }: { params: Promise<{ clsId: stri
 
   return (
     <>
-      <div className="grid flex-shrink-0 grid-cols-4 gap-3.5">
+      <div data-tour="overview" className="grid flex-shrink-0 grid-cols-4 gap-3.5">
         {tiles.map((t) => (
           <button
             key={t.label}
             onClick={t.go}
-            className="cursor-pointer rounded-2xl bg-card px-5 py-[18px] text-left text-ink shadow-card transition-shadow hover:shadow-[0_4px_16px_rgba(34,48,60,0.1)]"
+            className="relative cursor-pointer overflow-hidden rounded-2xl bg-card px-5 py-[18px] text-left text-ink shadow-card hover:-translate-y-0.5 hover:!border-[rgba(15,163,160,0.35)] hover:!shadow-[0_2px_4px_rgba(34,48,60,0.04),0_18px_36px_-14px_rgba(34,48,60,0.28)]"
           >
+            <div
+              className="absolute inset-x-0 top-0 h-[3px]"
+              style={{ background: `linear-gradient(90deg,${t.color},transparent)` }}
+            />
             <div
               className="font-display text-[32px] font-black leading-none tracking-[-1px]"
               style={{ color: t.color }}
@@ -262,7 +266,7 @@ export default function OverviewPage({ params }: { params: Promise<{ clsId: stri
         ))}
       </div>
 
-      <div className="-mx-1 mt-5 grid min-h-0 flex-1 grid-cols-2 content-start gap-5 overflow-y-auto px-1 pb-7">
+      <div className="-mx-1 mt-5 grid min-h-0 flex-1 auto-rows-max grid-cols-2 content-start gap-5 overflow-y-auto px-1 pb-7">
         {/* Needs attention */}
         <div className="flex flex-col gap-2.5">
           <div className="flex items-baseline justify-between px-0.5">

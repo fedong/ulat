@@ -213,8 +213,8 @@ export function TourOverlay({
               ))}
             </div>
             <div className="mt-3.5 flex items-center justify-between">
-              <span className="text-[13px] font-medium text-faint">
-                About 2 minutes · replay anytime from the Tour button
+              <span className="whitespace-nowrap text-[13px] font-medium text-faint">
+                About 2 minutes · replay anytime
               </span>
               <div className="flex gap-2">
                 <button

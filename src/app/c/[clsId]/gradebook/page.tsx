@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { use, useEffect, useRef } from "react";
 import { compPath, tx, txBase } from "@/lib/grading";
-import { usePeriodComputed } from "@/lib/hooks";
+import { useEntitlement, usePeriodComputed } from "@/lib/hooks";
 import { useClass, useUlat } from "@/lib/store";
 import type { Score } from "@/lib/types";
 
@@ -13,6 +13,7 @@ export default function GradebookPage({ params }: { params: Promise<{ clsId: str
   const st = useUlat();
   const cls = useClass(clsId);
   const computed = usePeriodComputed(cls);
+  const { ro } = useEntitlement();
   const gridRef = useRef<HTMLDivElement>(null);
 
   const focus = st.focus;
@@ -53,7 +54,7 @@ export default function GradebookPage({ params }: { params: Promise<{ clsId: str
   );
 
   const setCell = (ri: number, ci: number, v: Score | null) => {
-    if (periodClosed || !gbAsms[ci] || !roster[ri]) return;
+    if (periodClosed || ro.has(cls.id) || !gbAsms[ci] || !roster[ri]) return;
     const sid = roster[ri].id;
     const aid = gbAsms[ci].id;
     const prev = (cls.scores[sid] || {})[aid];

@@ -1,6 +1,15 @@
 "use client";
 
 import { create } from "zustand";
+import {
+  getEntitlement,
+  readOnlyIds,
+  type EntState,
+  type Invoice,
+  type PayMethod,
+  type PlanCycle,
+  type Sub,
+} from "./billing";
 import { seedClasses } from "./seed";
 import type { Grading, GuardianRole, Klass } from "./types";
 
@@ -75,6 +84,13 @@ export const DEFAULT_PROFILE: Profile = {
 
 export type ExportScope = string; // 'all' | 'period' | 'term' | 'attendance' | 'group:<id>'
 
+export interface CheckoutState {
+  plan: PlanCycle;
+  method: PayMethod;
+  step: "method" | "redirect" | "done";
+  until?: string;
+}
+
 export interface TourState {
   step: number;
 }
@@ -140,6 +156,21 @@ interface UlatState {
   exportSel: ExportScope | null;
   exportFmt: "xlsx" | "pdf";
   exportBusy: boolean;
+  /* v3.1 payments & entitlement — demo stand-in for /v1/auth/me */
+  entState: EntState;
+  payMethodPref: PayMethod;
+  sub: Sub | null;
+  subCancel: boolean;
+  menuOpen: boolean;
+  showPlans: boolean;
+  cycle: PlanCycle;
+  checkout: CheckoutState | null;
+  creditUsed: boolean;
+  invoices: Invoice[];
+  refCopied: boolean;
+  editableIds: string[] | null;
+  pickIds: string[] | null;
+  selDone: boolean;
 
   set: (patch: Partial<UlatState>) => void;
   /** Update one class; marks the store dirty and schedules the saved flip. */
@@ -192,13 +223,37 @@ export const useUlat = create<UlatState>((set, get) => ({
   exportSel: null,
   exportFmt: "xlsx",
   exportBusy: false,
+  entState: "Trialing",
+  payMethodPref: "Card",
+  sub: null,
+  subCancel: false,
+  menuOpen: false,
+  showPlans: false,
+  cycle: "Annual",
+  checkout: null,
+  creditUsed: false,
+  invoices: [],
+  refCopied: false,
+  editableIds: null,
+  pickIds: null,
+  selDone: false,
 
   set: (patch) => set(patch),
   upCls: (clsId, fn) => {
-    set((s) => ({
-      classes: s.classes.map((c) => (c.id === clsId ? { ...c, ...fn(c) } : c)),
-      saved: false,
-    }));
+    set((s) => {
+      const c0 = s.classes.find((c) => c.id === clsId);
+      if (!c0) return {};
+      const patch = fn(c0);
+      // Free-plan read-only classes drop grade/assessment/attendance writes.
+      const ent = getEntitlement(s.entState, s.payMethodPref, s.sub, s.subCancel);
+      const ro = readOnlyIds(ent, s.classes, s.editableIds);
+      if (ro.has(clsId) && ["scores", "assessments", "sessions"].some((k) => k in patch))
+        return {};
+      return {
+        classes: s.classes.map((c) => (c.id === clsId ? { ...c, ...patch } : c)),
+        saved: false,
+      };
+    });
     if (savedTimer) clearTimeout(savedTimer);
     savedTimer = setTimeout(() => {
       useUlat.setState({ saved: true });

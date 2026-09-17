@@ -2,12 +2,14 @@
 
 import { usePathname } from "next/navigation";
 import { exportPdf, exportXlsx } from "@/lib/export";
+import { useEntitlement } from "@/lib/hooks";
 import { useClass, useUlat } from "@/lib/store";
 
 export function ExportMenu({ clsId }: { clsId: string }) {
   const st = useUlat();
   const cls = useClass(clsId);
   const pathname = usePathname();
+  const { ent } = useEntitlement();
   if (!cls) return null;
   const gs = cls.grading;
   const page = pathname.split("/").pop() || "overview";
@@ -28,7 +30,7 @@ export function ExportMenu({ clsId }: { clsId: string }) {
     : page === "overview" || page === "students" ? "term"
     : "all";
   const exportSel = st.exportSel || exportDefault;
-  const isPaid = false; // Free tier in the prototype; plan wiring comes with the backend.
+  const isPaid = ent.tier === "PRO"; // §12: PDF branding shows only on the Free tier.
 
   const run = async () => {
     if (st.exportBusy) return;

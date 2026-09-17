@@ -2,12 +2,15 @@
 
 import { useParams, usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef } from "react";
+import { AccountMenu } from "@/components/AccountMenu";
 import { AnimatedLogo } from "@/components/AnimatedLogo";
 import { ConfirmDialogHost } from "@/components/ConfirmDialogHost";
 import { ExportMenu } from "@/components/ExportMenu";
+import { PlanBanner } from "@/components/PlanSurfaces";
 import { TourOverlay } from "@/components/TourOverlay";
-import { DEMO_INSTRUCTOR, headerMeta, profileFullName, profileInitials } from "@/lib/derive";
-import { useMounted, usePeriodComputed } from "@/lib/hooks";
+import { billingStrings } from "@/lib/billing";
+import { headerMeta } from "@/lib/derive";
+import { useEntitlement, useMounted, usePeriodComputed } from "@/lib/hooks";
 import { today, useUlat } from "@/lib/store";
 import type { Klass } from "@/lib/types";
 
@@ -33,6 +36,18 @@ export default function ClassLayout({ children }: { children: React.ReactNode })
   const st = useUlat();
   const cls = st.classes.find((c) => c.id === clsId);
   const computed = usePeriodComputed(cls);
+  const { limitHit, fil, L } = useEntitlement();
+  const t = billingStrings(fil);
+
+  // Demo-only entitlement override: localStorage.ulat_ent = Trialing | Active |
+  // Past due | Grace | Free (stand-in for the prototype's tweaks panel).
+  useEffect(() => {
+    try {
+      const v = localStorage.getItem("ulat_ent");
+      if (v && ["Trialing", "Active", "Past due", "Grace", "Free"].includes(v))
+        useUlat.setState({ entState: v as never });
+    } catch {}
+  }, []);
 
   // Auto-start the product tour on first arrival unless already seen.
   // eslint-disable-next-line react-hooks/rules-of-hooks -- stable hook order: this layout always reaches here
@@ -59,8 +74,37 @@ export default function ClassLayout({ children }: { children: React.ReactNode })
   const activeCls = st.classes.filter((c) => !c.archived);
   const archivedCls = st.classes.filter((c) => c.archived);
   const nInc = Object.values(computed).filter((c) => c.k === "inc").length;
-  const authName = profileFullName(st.profile) || DEMO_INSTRUCTOR.name;
-  const authEmail = st.auth.email || DEMO_INSTRUCTOR.email;
+  const onAccountPage = ["profile", "billing", "invoices", "referrals"].includes(page);
+  const headerTitle =
+    page === "billing" ? t.billing
+    : page === "profile" ? L("Profile settings", "Profile settings")
+    : page === "invoices" ? t.invoices
+    : page === "referrals" ? t.referrals
+    : cls.code + " · " + cls.title;
+  const headerSub =
+    page === "billing" ? t.billingSub
+    : page === "profile"
+      ? [st.profile.position, st.profile.department, st.profile.school].filter(Boolean).join(" · ") ||
+        L("Add your institution details below", "Add your institution details below")
+    : page === "invoices" ? t.invoicesSub
+    : page === "referrals" ? t.referralRule
+    : headerMeta(cls);
+
+  const newClass = () => {
+    if (limitHit) {
+      st.confirm({
+        title: L("You've reached 2 classes on the Free plan.", "Umabot ka na sa 2 klase sa Libreng plano."),
+        body: L(
+          "Pro gives you unlimited classes and the registrar-format export. Your existing classes are not affected.",
+          "Sa Pro, walang limitasyong klase at may registrar-format na export. Hindi maaapektuhan ang mga klase mo ngayon.",
+        ),
+        confirmLabel: t.seePlans,
+        onConfirm: () => router.push(`/c/${cls.id}/billing`),
+      });
+      return;
+    }
+    router.push("/new");
+  };
 
   const badges: Record<string, string> = {
     gradebook: nInc ? nInc + " INC" : "",
@@ -101,10 +145,7 @@ export default function ClassLayout({ children }: { children: React.ReactNode })
 
         <div className="mx-2 mb-2 mt-8 flex items-center justify-between">
           <span className="text-[11px] font-bold tracking-[1.2px] text-muted">CLASSES</span>
-          <button
-            onClick={() => router.push("/new")}
-            className="cursor-pointer p-0 text-xs font-bold text-amber"
-          >
+          <button onClick={newClass} className="cursor-pointer p-0 text-xs font-bold text-amber">
             + New
           </button>
         </div>
@@ -177,37 +218,7 @@ export default function ClassLayout({ children }: { children: React.ReactNode })
           })}
         </div>
 
-        <div
-          className="mt-auto flex items-center gap-2.5 rounded-[14px] px-3 py-2.5"
-          style={{
-            background: page === "profile" ? "rgba(15,163,160,0.14)" : "#16242F",
-            border: `1.5px solid ${page === "profile" ? "#0FA3A0" : "transparent"}`,
-          }}
-        >
-          <button
-            onClick={() => router.push(`/c/${cls.id}/profile`)}
-            title="Profile and account"
-            className="flex min-w-0 flex-1 cursor-pointer items-center gap-2.5 p-0 text-left text-canvas"
-          >
-            <div className="avatar-teal flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl font-display text-sm font-extrabold text-white">
-              {profileInitials(st.profile)}
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="truncate text-[13px] font-semibold">{authName}</div>
-              <div className="truncate text-xs text-muted">{authEmail}</div>
-            </div>
-          </button>
-          <button
-            onClick={() => {
-              st.set({ signedIn: false });
-              router.push("/signin");
-            }}
-            title="Sign out"
-            className="cursor-pointer p-1 text-sm font-bold text-muted"
-          >
-            ⏻
-          </button>
-        </div>
+        <AccountMenu clsId={cls.id} />
       </div>
 
       {/* Main column */}
@@ -215,12 +226,11 @@ export default function ClassLayout({ children }: { children: React.ReactNode })
         <div className="header-frost flex flex-shrink-0 items-center justify-between gap-6 px-8 py-[22px]">
           <div className="min-w-0">
             <div className="title-gradient truncate font-display text-[22px] font-extrabold tracking-[-0.4px]">
-              {cls.code} · {cls.title}
+              {headerTitle}
             </div>
-            <div className="mt-[3px] truncate text-[13px] font-medium text-sub">
-              {headerMeta(cls)}
-            </div>
+            <div className="mt-[3px] truncate text-[13px] font-medium text-sub">{headerSub}</div>
           </div>
+          {!onAccountPage && (
           <div className="flex flex-shrink-0 items-center gap-2.5">
             <span
               className="mr-1.5 inline-flex items-center gap-1.5 whitespace-nowrap text-xs font-medium"
@@ -237,16 +247,6 @@ export default function ClassLayout({ children }: { children: React.ReactNode })
             </span>
             <ExportMenu clsId={cls.id} />
             <button
-              onClick={() => st.set({ tour: { step: 0 }, tourRect: null })}
-              title="Product tour"
-              className="group flex h-[38px] cursor-pointer items-center gap-[7px] whitespace-nowrap rounded-xl border-[1.5px] border-line bg-card py-0 pl-2 pr-3 text-[13px] font-bold text-sub hover:border-teal hover:text-teal-text"
-            >
-              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-teal-tint-12 font-display text-xs font-extrabold text-teal-text">
-                ?
-              </span>
-              Tour
-            </button>
-            <button
               data-tour="add-asm"
               onClick={() => router.push(`/c/${cls.id}/assessments`)}
               className="h-[38px] cursor-pointer whitespace-nowrap rounded-xl bg-teal px-4 text-[13px] font-bold text-white"
@@ -254,7 +254,10 @@ export default function ClassLayout({ children }: { children: React.ReactNode })
               + Assessment
             </button>
           </div>
+          )}
         </div>
+
+        <PlanBanner clsId={cls.id} />
 
         <div className="bg-content-v3 flex min-h-0 flex-1 flex-col px-8 pb-7 pt-6">{children}</div>
       </div>

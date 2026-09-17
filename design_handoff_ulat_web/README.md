@@ -6,6 +6,64 @@ Ulat is a Philippine gradebook. Instructors run classes on the web: create a cla
 This package covers the **web app** (screen 4a) and the three **phone views** (4b instructor, 4c student, 4d guardian) that read from the same state.
 
 
+## What changed in v3.1 (Sep 18, 2026) — Payments & entitlement UI
+Companion to `Ulat_Payments_Implementation_Spec.md` (in this folder). The spec is the backend contract (NestJS + Prisma + PayMongo); this section is the UI it needs. Section numbers below refer to the spec.
+
+### Entitlement is read, never computed, on the client (§1)
+The prototype's `entitlement` tweak (Trialing · Active · Past due · Grace · Free) and `payMethod` tweak (Card · Maya · GCash) stand in for `/v1/auth/me` → `{ tier, state, until, method, plan, autoRenew }`. Every surface below derives from that object. Seed dates in the prototype: trial ends 14 Feb 2027; Active renews 3 Sep 2027; Past due retries until 2 Oct 2026; Grace until 12 Dec 2026 (term end). "Now" is fixed at 18 Sep 2026.
+
+### Account menu (sidebar, replaces profile card + separate plan chip)
+Profile card at the bottom of the sidebar: 36px gradient avatar with initials, name (600 13px), second line = 6px status dot + plan label (`Pro · trial` / `Pro` / `Pro · payment issue` / `Pro · grace period` / `Free plan`), chevron ▴ at right. Dot colour: Pro teal #0FA3A0, Past due #D14B33, Grace #F5B70A, Free #7B8792. Card border turns #0FA3A0 while on Profile or any billing page.
+Click opens a menu **above** the card: `#16242F`, 1.5px rgba(255,255,255,.1) border, radius 14, shadow 0 18px 40px rgba(0,0,0,.45), padding 6, `ulatIn` .2s. Rows 38px, radius 9, 600 13px, hover rgba(255,255,255,.07); active row rgba(15,163,160,.14) white. Order: email (muted 12px, divider) · Profile settings · Plan & billing (hint = renewal line) · Invoices · Refer a colleague (hint "₱199 credit each") · Take the tour · Get help · divider · Sign out. Backdrop click closes. The header **Tour** button was removed; tour lives here.
+
+### Header on account pages
+On Profile / Plan & billing / Invoices / Refer a colleague the header title and subline switch to the page name and its description (gradient title style unchanged), and the right-side cluster (save indicator, Export, + Assessment) is hidden.
+
+### Site-wide banner (§12 copy rules) — under the header, above content
+40px strip, 600 13px text, pill CTA (30px, 1.5px border in the text colour) at right; CTA hidden on the billing page itself.
+- TRIALING — bg rgba(15,163,160,.10), border rgba(15,163,160,.25), text #0B807E: **"You're on Pro — free until 14 February. 149 days left."** CTA "See plans". Date is day + month; days = ceil((until − now)/day).
+- GRACE — bg #FFF6DC / border #F2DFA0 / text #8A6400: **"Your Pro trial has ended. You'll keep full access until your term finishes on 12 December."** CTA "Keep Pro".
+- PAST_DUE — bg #FBE9E5 / #F1C7BE / #B03A24: "We couldn't charge your Card. Pro access continues while we retry until 2 October." CTA "Update payment method".
+- ACTIVE / FREE: no banner.
+
+### Plan & billing page (`page: 'billing'`)
+Column, gap 28, max-width 1000, `ulatIn` .35s.
+1. **Plan strip** (only when there is no banner, i.e. Active/Free): white, radius 14, padding 12 16; dot · plan name (700 14px) · state chip (11px pill; teal tint for Pro, #F1EDE5/#5A6672 for Free, red/amber tints for Past due/Grace) · one-line lead (e.g. "Renews automatically on 3 September 2027." / "2 active classes per term. Everything you record stays.") · facts as "Label **value**" (Plan · Payment method · Next charge|Ends · Active classes n / 2) · actions: **Cancel at period end** (opens confirm; then chip "Active · cancels at period end" and **Resume renewal**), **Change plan / Hide plans** toggle for Active users. GCash Active shows an amber note: *"GCash can't renew automatically. We'll remind you before your plan ends. Reminders on {T−14} · {T−7} · {T−1} · {T+0}."* (§6.2)
+2. **Checkout card** (see below) when open.
+3. **Pricing** (hidden by default when Active; toggle shows it): centred heading "Simple pricing for every teaching load" (800 24px) + subline; **Monthly | Yearly** segmented control (white, radius 12, 4px pad; selected #0FA3A0 white; Yearly carries a "2 months free" tag). Yearly is default (§12). Two equal-height cards max-width 860 centred, padding 28, flex column: header row (name 800 20px + badge) · price row 44px (900 40px, −1.5px tracking; "/ year" or "/ month" 600 15px #5A6672) · note (Pro: **₱100/month, billed yearly** in #0B807E, or "₱2,388/year billed monthly" on Monthly; then the audience line in italics-free 13px #5A6672) · divider · feature list (18px round check chips: Free #F1EDE5/#5A6672, Pro #0FA3A0/white; Pro list starts with "Everything in Free, plus:" 700 13px #0B807E) · footer. Free footer: disabled-looking "Current plan" or "Included after your trial" box + "No card needed". Pro card: bg linear-gradient(#FFFFFF, #F3FAFA), 1.5px #0FA3A0 border, teal shadow, badge "Best value" (or "Your plan" when Active); CTA gradient button 46px — label "Upgrade to Pro" (Free) / "Continue on Pro" (Trial, Grace) / "Update payment method" (Past due) / "Switch to yearly" (Active monthly); under it the method note: Yearly "Card · Maya · GCash", Monthly "Card · Maya. GCash is available on the yearly plan." Below the cards: "First yearly payment refundable within 14 days." Feature copy is verbatim from spec §12. **Never show a struck-through monthly total.**
+4. **Referral nudge**: dark card (gradient #101D26→#16242F, white text) "Know an instructor who would like Ulat?" / "Share your link. When they pay for a year, you get ₱199 off your next bill." + amber button (#F5B70A, hover #FFC633, text #22303C) "Refer a colleague" → referrals page.
+
+### Checkout (inline card, 1.5px #0FA3A0 border)
+Header: "CHECKOUT" eyebrow + plan label ("Pro · Yearly" / "Pro · Monthly") + Cancel. Two columns (1fr 320px):
+- **PAY WITH**: three equal tiles Card / Maya / GCash (radio dot, note "Renews automatically" / "Renews manually each year"). GCash tile is disabled at 50% opacity with note "Yearly plan only" when the plan is Monthly (§0). Picking GCash shows the amber notice.
+- **SUMMARY** (#FBF9F5 panel): plan line ₱1,199.00 / ₱199.00 · "Referral credit −₱199.00" when available credit > 0 (FIFO, §7) · "Due today" total (800 20px) · CTA "Continue to PayMongo · ₱1,000.00" — or **"Activate with credit"** when net = 0 (skip the gateway, §7 edge case) · refund line.
+Steps: `method` → `redirect` (pulsing dot, "Taking you to PayMongo to authorize the payment…", ~1.4s; the real app leaves to PayMongo's authorization URL in a full browser and activates **only on the webhook**, §6.1) → `done` ("Payment received. Pro is active until {date}. Your invoice is below." + GCash reminder note + "Back to plan"). On done the prototype sets a local `sub` (plan, method, until = now + 1y / 1m), marks the credit applied, prepends an invoice, and clears any read-only selection.
+
+### Invoices page (`page: 'invoices'`)
+Max-width 760. Top row: refund policy line · "Plan & billing →" button. List card: rows "Pro · Yearly · Card" / "{date} · {invoice no}" left; net amount + status right (Paid #0B807E, Failed · retrying #B03A24, Paid by credit). Empty state "No invoices yet. Your first one appears here after payment." Numbers are the BIR sequence (§9); prototype uses ULAT-000231 etc. The "Non-VAT registered" line was removed from the UI on request — keep it on the actual invoice document, not the list.
+
+### Refer a colleague page (`page: 'referrals'`)
+Three step cards (numbered teal circle 26px, title 700 14px, body 13px): Share your link → They go Pro for a year → You get ₱199 credit (14 days after their payment). Card: **YOUR LINK** `ulat.ph/r/DRIVERA7` with teal **Copy link** (→ "Copied" 1.5s, clipboard) · "Credit available ₱199.00" (900 26px #0B807E) · referral rows (name · status coloured: Awarded teal, Qualified amber "credit on 1 October", Signed up grey). Fine print: one award per referred person; credit is future-billing only, never cashed out, never expires; self-referrals and matching payment instruments ineligible (§7 guardrails).
+
+### Free limit (§5)
+- **+ New** in the sidebar, when tier FREE and active classes ≥ 2: teal confirm dialog **"You've reached 2 classes on the Free plan."** / "Pro gives you unlimited classes and the registrar-format export. Your existing classes are not affected." action "See plans" → billing. Enforced at creation, never by revocation.
+- **Mobile (4b Classes tab)**: a status card under the title — plan label + one line. At the limit the line is exactly *"You've reached 2 classes on the Free plan."* with **no CTA, no link, no price** (§8).
+- **Over the limit** (FREE with > 2 active classes, e.g. after grace expiry): a blocking modal **"Choose 2 classes to keep editable"** lists active classes as checkbox rows ("{n} grades recorded · {m} assessments"), pre-selects the 2 with the most recorded grades (stand-in for latest `gradedAt`), counter "n / 2 · most recently graded pre-selected", buttons "See plans" and "Keep these 2 editable" (disabled #B8C0C6 until exactly 2). Until saved, the pre-selected pair is editable and the rest read-only — there is always a defined state.
+- **Read-only class**: grey strip under the header: "This class is read-only on the Free plan. Viewing, export, student standing and guardian digests continue; new grades, assessments and attendance are paused." + "Choose classes" (reopens the modal). Writes to `scores`, `assessments`, `sessions` are dropped for that class (gradebook cells, + Assessment, attendance marks); settings, archive and export still work. Nothing is deleted.
+
+### Export tie-in
+PDF branding (Ulat mark + "Generated with Ulat · ulat.ph" footer) shows when `tier === 'FREE'`; Pro removes it. Replaces the old `plan: Free|Paid` prop.
+
+### Filipino strings
+All new copy goes through `L(en, fil)`; spec §12 table is used verbatim (Libre, Pinakasulit, kada taon, "₱100 kada buwan, bayad taunan", "Walang limitasyong klase", "Lahat ng nasa Libre, kasama ang:", "Nasa Pro ka — libre hanggang {date}.", "Umabot ka na sa 2 klase sa Libreng plano."). Have a native speaker check register before shipping.
+
+### State added (web)
+`page` gains `'billing' | 'invoices' | 'referrals'`; `menuOpen`; `cycle: 'Monthly'|'Annual'` (pricing toggle); `checkout: { plan, method, step: 'method'|'redirect'|'done', until } | null`; `sub` (local post-checkout override); `subCancel`; `showPlans`; `creditUsed`; `invoices[]`; `refCopied`; `editableIds`, `pickIds`, `selDone` (read-only selection). In production all of these except UI toggles come from the API.
+
+### Also in this drop
+- Overview grid uses `grid-auto-rows: max-content` so cards never overlap when the pane is short.
+- Tour welcome footer no longer wraps ("About 2 minutes · replay anytime"); wizard sidebar footer is a user card (avatar, name, email, outlined Sign out).
+
 ## What changed in v3 (Sep 17, 2026) — see `Ulat Web v3.dc.html` (canonical; v2 kept for reference)
 1. **Export scope dropdown** on the Export button: Whole gradebook · Current period · Grading groups · Term grades · Attendance. XLSX styling (SheetJS): teal brand header row, class title with instructor name, meta line (section · term · scope · date · passing), dark column headers with white text, alternating row fills, frozen student columns.
 2. **PDF export** (A4 landscape, print-ready, official grade-report styling): school header, meta block, grade table, signature block (Prepared by / Noted by / Approved by). Free tier shows the Ulat mark + footer; paid plans have branding removed.
@@ -202,7 +260,8 @@ Grade math (port exactly)
 `assets/ulat-mark.svg`, `assets/ulat-mark-white.svg` (logo marks). Icons are inline 24px stroke SVGs (1.8 stroke, round caps). Fonts from Google Fonts.
 
 ## Files
-- `Ulat Web v3.dc.html` — **canonical** web prototype (template + logic): v3 skin, export scope + PDF, profile settings, animated logo.
+- `Ulat Web v3.dc.html` — **canonical** web prototype (template + logic): v3 skin, export scope + PDF, profile settings, animated logo, payments & entitlement UI (v3.1).
+- `Ulat_Payments_Implementation_Spec.md` — backend contract for payments, entitlement, credits, referrals, tax.
 - `Ulat Web v2.dc.html` — previous version, kept for diffing.
 - `Ulat Prototype.dc.html` — mobile prototype (instructor / student / guardian phones).
 - `support.js` — runtime needed to open the prototype in a browser; not part of the design.

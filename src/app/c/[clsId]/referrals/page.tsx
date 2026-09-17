@@ -1,0 +1,109 @@
+"use client";
+
+import { billingStrings, peso } from "@/lib/billing";
+import { useEntitlement } from "@/lib/hooks";
+import { useUlat } from "@/lib/store";
+
+export default function ReferralsPage() {
+  const st = useUlat();
+  const { L, fil } = useEntitlement();
+  const t = billingStrings(fil);
+  const creditAvail = st.creditUsed ? 0 : 19900;
+
+  const steps: [string, string][] = [
+    [
+      L("Share your link", "Ibahagi ang link"),
+      L(
+        "Send it to a colleague. They sign up and get the same 5-month Pro trial.",
+        "Ipadala sa kasamahan. Mag-sign up sila at makukuha ang parehong 5-buwang Pro trial.",
+      ),
+    ],
+    [
+      L("They go Pro for a year", "Mag-Pro sila ng isang taon"),
+      L("The referral qualifies on their first yearly payment.", "Kwalipikado ang referral sa unang taunang bayad nila."),
+    ],
+    [
+      L("You get ₱199 credit", "Makakakuha ka ng ₱199 credit"),
+      L(
+        "Applied automatically to your next bill, 14 days after their payment.",
+        "Awtomatikong ibabawas sa susunod mong bayad, 14 araw pagkabayad nila.",
+      ),
+    ],
+  ];
+  const referrals = [
+    {
+      name: "J. Dela Cruz",
+      status: st.creditUsed ? L("Awarded · ₱199 applied", "Naibigay · ₱199 nagamit") : L("Awarded · ₱199 credit", "Naibigay · ₱199 credit"),
+      color: "#0B807E",
+    },
+    { name: "R. Santos", status: L("Qualified · credit on 1 October", "Kwalipikado · credit sa 1 Oktubre"), color: "#8A6400" },
+    { name: "M. Villanueva", status: L("Signed up · not yet paid", "Naka-sign up · hindi pa bayad"), color: "#9AA3AB" },
+  ];
+
+  const copyRef = () => {
+    try {
+      navigator.clipboard.writeText("https://ulat.ph/r/DRIVERA7");
+    } catch {}
+    st.set({ refCopied: true });
+    setTimeout(() => useUlat.setState({ refCopied: false }), 1500);
+  };
+
+  return (
+    <div
+      className="-mr-2 flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto pr-2"
+      style={{ animation: "ulatIn .35s ease both" }}
+    >
+      <div className="grid max-w-[760px] grid-cols-3 gap-3">
+        {steps.map(([title, body], i) => (
+          <div key={i} className="flex flex-col gap-2 rounded-2xl bg-card px-[18px] py-4 shadow-card">
+            <span className="inline-flex h-[26px] w-[26px] items-center justify-center rounded-full bg-teal-tint-12 font-display text-[13px] font-extrabold text-teal-text">
+              {i + 1}
+            </span>
+            <div className="text-sm font-bold">{title}</div>
+            <div className="text-[13px] leading-[1.5] text-sub">{body}</div>
+          </div>
+        ))}
+      </div>
+
+      <div className="max-w-[760px]">
+        <div className="flex flex-col gap-3.5 rounded-2xl bg-card px-5 py-[18px] shadow-card">
+          <div className="flex items-center justify-between gap-3 rounded-xl border border-line bg-canvas px-3.5 py-3">
+            <div className="min-w-0">
+              <div className="label-caps text-sub">{t.yourLink}</div>
+              <div className="mt-0.5 truncate font-display text-base font-extrabold tracking-[0.3px]">
+                ulat.ph/r/DRIVERA7
+              </div>
+            </div>
+            <button
+              onClick={copyRef}
+              className="h-9 flex-shrink-0 cursor-pointer whitespace-nowrap rounded-[10px] bg-teal px-3.5 text-[13px] font-bold text-white"
+            >
+              {st.refCopied ? L("Copied", "Nakopya") : L("Copy link", "Kopyahin ang link")}
+            </button>
+          </div>
+          <div className="flex items-baseline justify-between gap-3">
+            <span className="text-sm font-medium text-sub">{t.creditBalance}</span>
+            <span className="font-display text-[26px] font-black tracking-[-0.6px] text-teal-text">
+              {peso(creditAvail)}
+            </span>
+          </div>
+          <div className="flex flex-col">
+            {referrals.map((r) => (
+              <div
+                key={r.name}
+                className="flex justify-between gap-3 border-t border-hairline py-2.5 text-[13px] font-medium"
+              >
+                <span>{r.name}</span>
+                <span className="text-right font-semibold" style={{ color: r.color }}>
+                  {r.status}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="max-w-[760px] text-xs leading-[1.5] text-faint">{t.referFine}</div>
+    </div>
+  );
+}

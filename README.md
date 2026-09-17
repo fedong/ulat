@@ -50,7 +50,15 @@ co-instructors, archive/delete), the guided product tour (auto-starts once;
 replay from the ? Tour button), the v3 visual skin (gradient sidebar, frosted
 header, animated logo), real exports (styled XLSX via xlsx-js-style and an A4
 PDF grade report via html2pdf.js, both with a scope dropdown), and the Profile
-page (draft-based edits applied system-wide, reached from the sidebar card).
+page (draft-based edits applied system-wide), and the v3.1 payments &
+entitlement UI: sidebar account menu with plan status, site-wide trial/grace/
+past-due banners, Plan & billing with Monthly|Yearly pricing and a simulated
+PayMongo checkout (Card / Maya / GCash, referral credit), Invoices, Refer a
+colleague, and Free-plan limits (2-class gate, choose-2-editable modal,
+read-only classes with dropped writes). Entitlement is a demo stand-in for
+`/v1/auth/me` — preview other states via
+`localStorage.setItem("ulat_ent", "Free" /* Trialing | Active | Past due | Grace */)`
+and reload.
 
 Next milestones: the 4-step class wizard (roster import/parsing) and the
 instructor/student/guardian mobile views.
