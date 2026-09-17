@@ -73,6 +73,14 @@ const SLIDES: { lines: string[]; sub: string }[] = [
     sub: "Transmutation, standing and period grades update live. Finished periods lock as Final.",
   },
   {
+    lines: ["Attendance that", "talks to grades."],
+    sub: "Mark the class in one pass. Absences flow into the same-day assessment, lecture or lab, and can be excused within 30 days.",
+  },
+  {
+    lines: ["Families in the loop,", "without the paperwork."],
+    sub: "Link a guardian once. Every class shares automatically under its own policy, no per-student approval.",
+  },
+  {
     lines: ["Reports that look official", "because they are."],
     sub: "Export gradebooks to Excel or a signed PDF grade report with your school header in one click.",
   },
