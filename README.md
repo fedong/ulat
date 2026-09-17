@@ -43,9 +43,11 @@ Instructor web app pages are implemented against the handoff: Overview
 analytics, Gradebook with keyboard entry (arrows/Tab, digits, `m`/`e`, undo,
 closed periods), Assessments with archive + attendance-linked prefill,
 Attendance with P/L/A/E cycling linked to scores, Students with the full detail
-panel (record, work, remarks, shared view, flags), Sharing consent table, and
-Settings (grading editor, scale/passing, transmutation, periods, term grade,
-consultation hours, co-instructors, archive/delete).
+panel (record, work, remarks, shared view, flags), Sharing (v2.1 account-level
+guardian links: class policy bar, role chips, invite flow), Settings (grading
+editor, scale/passing, transmutation, periods, term grade, consultation hours,
+co-instructors, archive/delete), and the guided product tour (auto-starts once;
+replay from the ? Tour button).
 
 Next milestones: the 4-step class wizard (roster import/parsing), XLSX export,
 and the student/guardian mobile views.

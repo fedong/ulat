@@ -2,7 +2,9 @@
 
 import Image from "next/image";
 import { useParams, usePathname, useRouter } from "next/navigation";
+import { useEffect, useRef } from "react";
 import { ConfirmDialogHost } from "@/components/ConfirmDialogHost";
+import { TourOverlay } from "@/components/TourOverlay";
 import { DEMO_INSTRUCTOR, headerMeta, initialsOf } from "@/lib/derive";
 import { useMounted, usePeriodComputed } from "@/lib/hooks";
 import { today, useUlat } from "@/lib/store";
@@ -23,11 +25,28 @@ const PAGES: [string, string][] = [
 export default function ClassLayout({ children }: { children: React.ReactNode }) {
   const { clsId } = useParams<{ clsId: string }>();
   const router = useRouter();
+  const shellRef = useRef<HTMLDivElement>(null);
+  const tourAuto = useRef(false);
   const pathname = usePathname();
   const mounted = useMounted();
   const st = useUlat();
   const cls = st.classes.find((c) => c.id === clsId);
   const computed = usePeriodComputed(cls);
+
+  // Auto-start the product tour on first arrival unless already seen.
+  // eslint-disable-next-line react-hooks/rules-of-hooks -- stable hook order: this layout always reaches here
+  useEffect(() => {
+    if (!mounted || tourAuto.current) return;
+    tourAuto.current = true;
+    let seen = false;
+    try {
+      seen = !!localStorage.getItem("ulat_tour_done");
+    } catch {}
+    if (!seen) {
+      const t = setTimeout(() => useUlat.setState({ tour: { step: 0 } }), 500);
+      return () => clearTimeout(t);
+    }
+  }, [mounted]);
 
   if (!mounted) return <div className="h-dvh bg-canvas" />;
   if (!cls) {
@@ -66,8 +85,12 @@ export default function ClassLayout({ children }: { children: React.ReactNode })
   };
 
   return (
-    <div className="relative grid h-dvh grid-cols-[240px_minmax(0,1fr)] overflow-hidden bg-canvas">
+    <div
+      ref={shellRef}
+      className="relative grid h-dvh grid-cols-[240px_minmax(0,1fr)] overflow-hidden bg-canvas"
+    >
       <ConfirmDialogHost />
+      <TourOverlay clsId={cls.id} shellRef={shellRef} />
 
       {/* Sidebar */}
       <div className="flex min-h-0 flex-col bg-panel px-4 py-6 text-canvas">
@@ -85,7 +108,7 @@ export default function ClassLayout({ children }: { children: React.ReactNode })
             + New
           </button>
         </div>
-        <div className="flex flex-col gap-1">
+        <div data-tour="classes" className="flex flex-col gap-1">
           {activeCls.map((c) => {
             const on = c.id === cls.id;
             return (
@@ -132,7 +155,7 @@ export default function ClassLayout({ children }: { children: React.ReactNode })
         <div className="mx-2 mb-2 mt-7 text-[11px] font-bold tracking-[1.2px] text-muted">
           THIS CLASS
         </div>
-        <div className="flex flex-col gap-0.5">
+        <div data-tour="nav" className="flex flex-col gap-0.5">
           {PAGES.map(([p, label]) => {
             const on = page === p;
             const badge = badges[p] || "";
@@ -201,6 +224,17 @@ export default function ClassLayout({ children }: { children: React.ReactNode })
               Export XLSX
             </button>
             <button
+              onClick={() => st.set({ tour: { step: 0 }, tourRect: null })}
+              title="Product tour"
+              className="group flex h-[38px] cursor-pointer items-center gap-[7px] whitespace-nowrap rounded-xl border-[1.5px] border-line bg-card py-0 pl-2 pr-3 text-[13px] font-bold text-sub hover:border-teal hover:text-teal-text"
+            >
+              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-teal-tint-12 font-display text-xs font-extrabold text-teal-text">
+                ?
+              </span>
+              Tour
+            </button>
+            <button
+              data-tour="add-asm"
               onClick={() => router.push(`/c/${cls.id}/assessments`)}
               className="h-[38px] cursor-pointer whitespace-nowrap rounded-xl bg-teal px-4 text-[13px] font-bold text-white"
             >

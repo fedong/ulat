@@ -158,7 +158,10 @@ export default function AttendancePage({ params }: { params: Promise<{ clsId: st
         </div>
       </div>
 
-      <div className="flex min-h-0 flex-shrink flex-col overflow-hidden rounded-2xl bg-card shadow-card">
+      <div
+        data-tour="attendance"
+        className="flex min-h-0 flex-shrink flex-col overflow-hidden rounded-2xl bg-card shadow-card"
+      >
         <div className="min-h-0 flex-1 overflow-auto">
           <div style={{ minWidth: attMinW }}>
             <div

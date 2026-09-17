@@ -2,7 +2,7 @@
 
 import { create } from "zustand";
 import { seedClasses } from "./seed";
-import type { Grading, Klass } from "./types";
+import type { Grading, GuardianRole, Klass } from "./types";
 
 export interface NewAssessmentDraft {
   name: string;
@@ -26,6 +26,26 @@ export interface UndoEntry {
   sid: string;
   aid: string;
   prev: number | "MISSED" | "EXC" | null | undefined;
+}
+
+/** A guardian invite sent from the Sharing page (pending until they register). */
+export interface PendingGuardian {
+  name: string;
+  contact: string;
+  role: GuardianRole;
+  date: string;
+}
+
+export interface TourState {
+  step: number;
+}
+
+export interface TourRect {
+  key: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
 }
 
 export interface AuthDraft {
@@ -62,6 +82,17 @@ interface UlatState {
   teamInvite: string;
   dialog: ConfirmDialog | null;
   showTx: boolean;
+  /** Sharing page: student id whose inline invite panel is open, and its fields. */
+  linkFor: string | null;
+  linkName: string;
+  linkContact: string;
+  linkRole: GuardianRole;
+  /** Pending guardian invites per student id (account-level in the real backend). */
+  links: Record<string, PendingGuardian[]>;
+  /** Students already asked/reminded from the Sharing page. */
+  nudged: Record<string, boolean>;
+  tour: TourState | null;
+  tourRect: TourRect | null;
 
   set: (patch: Partial<UlatState>) => void;
   /** Update one class; marks the store dirty and schedules the saved flip. */
@@ -99,6 +130,14 @@ export const useUlat = create<UlatState>((set, get) => ({
   teamInvite: "",
   dialog: null,
   showTx: false,
+  linkFor: null,
+  linkName: "",
+  linkContact: "",
+  linkRole: "Mother",
+  links: {},
+  nudged: {},
+  tour: null,
+  tourRect: null,
 
   set: (patch) => set(patch),
   upCls: (clsId, fn) => {

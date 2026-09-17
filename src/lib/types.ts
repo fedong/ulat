@@ -119,6 +119,10 @@ export interface Klass {
   consult: { slots: ConsultSlot[]; note: string };
   team?: TeamMember[];
   archived?: boolean;
+  /** Class sharing policy: what every linked guardian sees. Grades and Attendance are always on. */
+  guardianScopes?: Record<string, boolean>;
 }
+
+export type GuardianRole = "Mother" | "Father" | "Grandparent" | "Guardian";
 
 export type Standing = "pass" | "risk" | "fail" | "inc";

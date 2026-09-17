@@ -147,7 +147,10 @@ export default function SettingsPage({ params }: { params: Promise<{ clsId: stri
   });
 
   return (
-    <div className="-mr-2 flex min-h-0 flex-1 flex-col gap-7 overflow-y-auto pr-2">
+    <div
+      data-tour="settings"
+      className="-mr-2 flex min-h-0 flex-1 flex-col gap-7 overflow-y-auto pr-2"
+    >
       {/* 1 · Grading components */}
       <div className="flex max-w-[960px] flex-col gap-3">
         <div className="flex items-center justify-between gap-4 px-0.5">

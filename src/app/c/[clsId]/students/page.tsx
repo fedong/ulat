@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { use } from "react";
-import { CONSENTS_RAW } from "@/lib/consents";
+import { CONSENTS_RAW, DEFAULT_GUARDIAN_SCOPES } from "@/lib/consents";
 import { consultSummary, fmtDate } from "@/lib/derive";
 import {
   ATT_COLORS,
@@ -10,6 +10,7 @@ import {
   attRate,
   compPath,
   compute,
+  periodOf,
   termOf,
 } from "@/lib/grading";
 import { usePeriodComputed } from "@/lib/hooks";
@@ -157,6 +158,17 @@ export default function StudentsPage({ params }: { params: Promise<{ clsId: stri
 
     const tm = termOf(cls, gs, periods, sr.id);
     const periodLabel = st.period + (periodClosed ? " · Final" : "");
+    const termMethod = gs.termMethod === "cumulative" ? "cumulative" : "average";
+    const gradedPeriods = periods.filter((p) => {
+      const r = periodOf(cls, gs, sr.id, p);
+      return r && r.pct !== null;
+    }).length;
+    const termLine =
+      termMethod === "cumulative"
+        ? "Running grade " + tm.grade
+        : gradedPeriods > 1
+          ? "Term so far " + tm.grade + " · avg of " + gradedPeriods + " periods"
+          : "Term so far · after " + gradedPeriods + " of " + periods.length + " periods";
 
     const trend = periods.map((p) => {
       const set = asms.filter((a) => a.period === p);
@@ -260,7 +272,9 @@ export default function StudentsPage({ params }: { params: Promise<{ clsId: stri
       }));
 
     const ci = roster.findIndex((r) => r.id === sr.id);
-    const [gName, gScopes, , gStatus] = CONSENTS_RAW[ci % CONSENTS_RAW.length];
+    const [gRawSd, , , gStatus] = CONSENTS_RAW[ci % CONSENTS_RAW.length];
+    const gList = gRawSd.split("|");
+    const gName = gList.length > 1 ? gList[0] + " +" + (gList.length - 1) + " more" : gRawSd;
     const studentSees: [string, string][] = [
       ["Grade and standing", c.grade + " · " + c.chipPlain],
       ["Weighted total", c.pctText],
@@ -268,8 +282,12 @@ export default function StudentsPage({ params }: { params: Promise<{ clsId: stri
       ["Attendance", rate + "%"],
       ["Remark", saved ? "Shown" : "None yet"],
     ];
-    const scopeOn = (s: string) => gScopes.includes(s) && gStatus === "Active";
-    const guardianName = gStatus === "Not linked" ? "No guardian linked" : gName + " · " + gStatus;
+    const gScopeSet = cls.guardianScopes || DEFAULT_GUARDIAN_SCOPES;
+    const scopeOn = (s: string) => !!gScopeSet[s] && gStatus === "Active";
+    const guardianName =
+      gStatus === "Not linked"
+        ? "No guardian linked"
+        : gName + " · " + (gStatus === "Active" ? "Linked" : gStatus);
     const guardianSees =
       gStatus === "Not linked"
         ? []
@@ -336,7 +354,7 @@ export default function StudentsPage({ params }: { params: Promise<{ clsId: stri
             </div>
             <div className="mt-1 text-[11px] font-semibold text-sub">{periodLabel}</div>
             <div className="text-xs font-bold" style={{ color: tm.color }}>
-              {tm.label} {tm.grade}
+              {termLine}
             </div>
           </div>
         </div>
@@ -610,7 +628,10 @@ export default function StudentsPage({ params }: { params: Promise<{ clsId: stri
   }
 
   return (
-    <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_400px] items-start gap-5">
+    <div
+      data-tour="students"
+      className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_400px] items-start gap-5"
+    >
       <div className="flex max-h-full min-h-0 min-w-0 flex-col gap-3.5">
         <div className="flex flex-shrink-0 flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap gap-1.5">

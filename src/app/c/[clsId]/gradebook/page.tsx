@@ -197,6 +197,7 @@ export default function GradebookPage({ params }: { params: Promise<{ clsId: str
 
       <div
         ref={gridRef}
+        data-tour="gradebook"
         tabIndex={0}
         onKeyDown={onKey}
         className="flex min-h-0 flex-shrink flex-col overflow-hidden rounded-2xl bg-card shadow-card outline-none"
