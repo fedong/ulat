@@ -27,7 +27,13 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${gabarito.variable} ${figtree.variable} antialiased`}>
+      {/* suppressHydrationWarning: browser extensions (e.g. ColorZilla's
+          cz-shortcut-listen) add attributes to <body> before React hydrates;
+          the suppression is one element deep, so real mismatches still warn. */}
+      <body
+        suppressHydrationWarning
+        className={`${gabarito.variable} ${figtree.variable} antialiased`}
+      >
         {children}
       </body>
     </html>
