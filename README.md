@@ -52,5 +52,5 @@ header, animated logo), real exports (styled XLSX via xlsx-js-style and an A4
 PDF grade report via html2pdf.js, both with a scope dropdown), and the Profile
 page (draft-based edits applied system-wide, reached from the sidebar card).
 
-Next milestones: the 4-step class wizard (roster import/parsing), XLSX export,
-and the student/guardian mobile views.
+Next milestones: the 4-step class wizard (roster import/parsing) and the
+instructor/student/guardian mobile views.
