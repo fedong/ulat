@@ -98,7 +98,9 @@ export function TourOverlay({
 
   if (!tDef) return null;
 
-  const firstName = (st.auth.name || DEMO_INSTRUCTOR.name).replace(/^Prof\.\s*/, "").split(" ")[0];
+  const firstName =
+    st.profile.first ||
+    (st.auth.name || DEMO_INSTRUCTOR.name).replace(/^Prof\.\s*/, "").split(" ")[0];
   const title = tDef.title.replace("{name}", firstName);
   const isWelcome = tDef.key === "welcome";
   const isDone = tDef.key === "done";

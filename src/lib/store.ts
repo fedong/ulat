@@ -36,6 +36,45 @@ export interface PendingGuardian {
   date: string;
 }
 
+export interface Profile {
+  title: string;
+  first: string;
+  last: string;
+  suffix: string;
+  /** How students/guardians see the name: "short" = Title + last name, "full". */
+  nameStyle: "short" | "full";
+  school: string;
+  department: string;
+  position: string;
+  facultyId: string;
+  license: string;
+  mobile: string;
+  office: string;
+  lang: "English" | "Filipino";
+  notif: { risk: boolean; digest: boolean; invites: boolean };
+  pwChanged: string;
+}
+
+export const DEFAULT_PROFILE: Profile = {
+  title: "Prof.",
+  first: "Dolores",
+  last: "Rivera",
+  suffix: "",
+  nameStyle: "short",
+  school: "Visayas State College of Health Sciences",
+  department: "College of Medical Technology",
+  position: "Associate Professor",
+  facultyId: "2016-0233",
+  license: "",
+  mobile: "0917 555 0142",
+  office: "CMT 3-B",
+  lang: "English",
+  notif: { risk: true, digest: true, invites: true },
+  pwChanged: "June 2026",
+};
+
+export type ExportScope = string; // 'all' | 'period' | 'term' | 'attendance' | 'group:<id>'
+
 export interface TourState {
   step: number;
 }
@@ -93,6 +132,14 @@ interface UlatState {
   nudged: Record<string, boolean>;
   tour: TourState | null;
   tourRect: TourRect | null;
+  profile: Profile;
+  /** Unsaved Profile edits; null when clean. */
+  profileDraft: Profile | null;
+  profileToast: boolean;
+  exportOpen: boolean;
+  exportSel: ExportScope | null;
+  exportFmt: "xlsx" | "pdf";
+  exportBusy: boolean;
 
   set: (patch: Partial<UlatState>) => void;
   /** Update one class; marks the store dirty and schedules the saved flip. */
@@ -138,6 +185,13 @@ export const useUlat = create<UlatState>((set, get) => ({
   nudged: {},
   tour: null,
   tourRect: null,
+  profile: DEFAULT_PROFILE,
+  profileDraft: null,
+  profileToast: false,
+  exportOpen: false,
+  exportSel: null,
+  exportFmt: "xlsx",
+  exportBusy: false,
 
   set: (patch) => set(patch),
   upCls: (clsId, fn) => {

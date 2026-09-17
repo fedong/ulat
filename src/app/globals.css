@@ -92,3 +92,165 @@ body {
     display: none;
   }
 }
+
+/* ---------- v3 skin ---------- */
+
+::selection {
+  background: rgba(15, 163, 160, 0.25);
+}
+
+button {
+  transition:
+    background-color 0.18s ease,
+    border-color 0.18s ease,
+    color 0.18s ease,
+    box-shadow 0.22s ease,
+    transform 0.18s ease;
+}
+button:active {
+  transform: translateY(0.5px) scale(0.99);
+}
+input,
+select,
+textarea {
+  transition:
+    border-color 0.18s ease,
+    box-shadow 0.18s ease;
+}
+input:focus,
+textarea:focus,
+select:focus {
+  border-color: #0fa3a0 !important;
+  box-shadow: 0 0 0 3px rgba(15, 163, 160, 0.18);
+}
+
+@layer components {
+  /* Cards: gradient fill + hairline border + two-stage shadow. Explicit
+     border-* utilities on a card still win (utilities layer beats components). */
+  .bg-card.shadow-card {
+    background: linear-gradient(180deg, #ffffff 0%, #fdfcfa 100%);
+    border: 1px solid rgba(34, 48, 60, 0.06);
+    box-shadow:
+      0 1px 2px rgba(34, 48, 60, 0.04),
+      0 8px 24px -12px rgba(34, 48, 60, 0.18);
+  }
+  /* Primary teal surfaces get the v3 gradient; buttons also glow. */
+  .bg-teal {
+    background: linear-gradient(135deg, #17b5b1 0%, #0fa3a0 55%, #0b8f8c 100%);
+  }
+  button.bg-teal {
+    box-shadow:
+      0 1px 0 rgba(255, 255, 255, 0.25) inset,
+      0 6px 16px -6px rgba(15, 163, 160, 0.55);
+  }
+}
+
+/* Sidebar / brand panels: deep navy with teal aura and amber glow */
+@utility bg-panel-v3 {
+  background:
+    radial-gradient(140% 50% at -10% 0%, rgba(15, 163, 160, 0.26) 0%, rgba(15, 163, 160, 0) 55%),
+    radial-gradient(80% 40% at 100% 100%, rgba(245, 183, 10, 0.08) 0%, rgba(245, 183, 10, 0) 60%),
+    linear-gradient(180deg, #0e1a22 0%, #101d26 50%, #0b151c 100%);
+}
+@utility bg-brand-v3 {
+  background:
+    radial-gradient(90% 70% at 100% 100%, rgba(15, 163, 160, 0.35) 0%, rgba(15, 163, 160, 0) 60%),
+    radial-gradient(60% 50% at 0% 0%, rgba(245, 183, 10, 0.14) 0%, rgba(245, 183, 10, 0) 55%),
+    linear-gradient(160deg, #0e1a22 0%, #101d26 60%, #0a141b 100%);
+}
+@utility bg-content-v3 {
+  background:
+    radial-gradient(60% 40% at 100% 0%, rgba(15, 163, 160, 0.07) 0%, rgba(15, 163, 160, 0) 60%),
+    radial-gradient(50% 35% at 0% 100%, rgba(245, 183, 10, 0.06) 0%, rgba(245, 183, 10, 0) 60%),
+    #efebe3;
+}
+@utility header-frost {
+  background: rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(14px) saturate(1.2);
+  -webkit-backdrop-filter: blur(14px) saturate(1.2);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.6) inset;
+  border-bottom: 1px solid rgba(34, 48, 60, 0.07);
+}
+@utility title-gradient {
+  background: linear-gradient(90deg, #101d26 0%, #22303c 60%, #0b807e 140%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+@utility avatar-teal {
+  background: linear-gradient(135deg, #17b5b1, #0b8f8c);
+  box-shadow: 0 4px 10px -4px rgba(15, 163, 160, 0.6);
+}
+
+/* Animated logo + hero (v3) */
+@keyframes ulatIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes ulatPulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(15, 163, 160, 0.45);
+  }
+  70% {
+    box-shadow: 0 0 0 6px rgba(15, 163, 160, 0);
+  }
+}
+@keyframes ulatBubble {
+  0% {
+    opacity: 0;
+    transform: translateY(10px) scale(0.85);
+  }
+  60% {
+    opacity: 1;
+    transform: translateY(-2px) scale(1.03);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes ulatDraw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes ulatArrow {
+  0% {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+  70% {
+    opacity: 1;
+    transform: scale(1.18);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+@keyframes ulatWord {
+  0% {
+    opacity: 0;
+    transform: translateX(-8px);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes ulatGlow {
+  0%,
+  100% {
+    filter: drop-shadow(0 0 8px rgba(15, 163, 160, 0.35));
+  }
+  50% {
+    filter: drop-shadow(0 0 18px rgba(15, 163, 160, 0.7));
+  }
+}

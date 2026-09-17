@@ -1,11 +1,12 @@
 "use client";
 
-import Image from "next/image";
 import { useParams, usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef } from "react";
+import { AnimatedLogo } from "@/components/AnimatedLogo";
 import { ConfirmDialogHost } from "@/components/ConfirmDialogHost";
+import { ExportMenu } from "@/components/ExportMenu";
 import { TourOverlay } from "@/components/TourOverlay";
-import { DEMO_INSTRUCTOR, headerMeta, initialsOf } from "@/lib/derive";
+import { DEMO_INSTRUCTOR, headerMeta, profileFullName, profileInitials } from "@/lib/derive";
 import { useMounted, usePeriodComputed } from "@/lib/hooks";
 import { today, useUlat } from "@/lib/store";
 import type { Klass } from "@/lib/types";
@@ -58,7 +59,7 @@ export default function ClassLayout({ children }: { children: React.ReactNode })
   const activeCls = st.classes.filter((c) => !c.archived);
   const archivedCls = st.classes.filter((c) => c.archived);
   const nInc = Object.values(computed).filter((c) => c.k === "inc").length;
-  const authName = st.auth.name || DEMO_INSTRUCTOR.name;
+  const authName = profileFullName(st.profile) || DEMO_INSTRUCTOR.name;
   const authEmail = st.auth.email || DEMO_INSTRUCTOR.email;
 
   const badges: Record<string, string> = {
@@ -93,10 +94,9 @@ export default function ClassLayout({ children }: { children: React.ReactNode })
       <TourOverlay clsId={cls.id} shellRef={shellRef} />
 
       {/* Sidebar */}
-      <div className="flex min-h-0 flex-col bg-panel px-4 py-6 text-canvas">
-        <div className="flex items-center gap-2.5 px-2">
-          <Image src="/ulat-mark-white.svg" alt="" width={30} height={30} />
-          <span className="font-display text-[26px] font-black tracking-[-0.8px]">ulat</span>
+      <div className="bg-panel-v3 flex min-h-0 flex-col border-r border-white/5 px-4 py-6 text-canvas">
+        <div className="flex h-[34px] items-center px-2">
+          <AnimatedLogo size={30} />
         </div>
 
         <div className="mx-2 mb-2 mt-8 flex items-center justify-between">
@@ -115,7 +115,7 @@ export default function ClassLayout({ children }: { children: React.ReactNode })
               <button
                 key={c.id}
                 onClick={() => pickCls(c)}
-                className={`cursor-pointer rounded-xl px-3 py-2.5 text-left ${on ? "bg-teal text-white" : "text-canvas hover:bg-panel-hover"}`}
+                className={`cursor-pointer rounded-xl px-3 py-2.5 text-left ${on ? "bg-teal text-white" : "text-canvas hover:bg-white/[0.06]"}`}
               >
                 <div className="text-sm font-bold">
                   {c.code} · {c.section}
@@ -141,7 +141,7 @@ export default function ClassLayout({ children }: { children: React.ReactNode })
                 <button
                   key={c.id}
                   onClick={() => pickCls(c)}
-                  className={`cursor-pointer rounded-xl px-3 py-2 text-left ${on ? "bg-teal text-white" : "text-muted hover:bg-panel-hover"}`}
+                  className={`cursor-pointer rounded-xl px-3 py-2 text-left ${on ? "bg-teal text-white" : "text-muted hover:bg-white/[0.06]"}`}
                 >
                   <div className="text-[13px] font-semibold">
                     {c.code} · {c.section}
@@ -163,7 +163,7 @@ export default function ClassLayout({ children }: { children: React.ReactNode })
               <button
                 key={p}
                 onClick={() => router.push(`/c/${cls.id}/${p}`)}
-                className={`flex h-[38px] cursor-pointer items-center justify-between rounded-xl px-3 text-left text-sm font-semibold ${on ? "bg-panel-hover text-white" : "text-[#B7C0C8] hover:bg-panel-hover"}`}
+                className={`flex h-[38px] cursor-pointer items-center justify-between rounded-xl px-3 text-left text-sm font-semibold ${on ? "bg-panel-hover text-white" : "text-[#B7C0C8] hover:bg-white/[0.06]"}`}
               >
                 {label}
                 <span
@@ -177,14 +177,26 @@ export default function ClassLayout({ children }: { children: React.ReactNode })
           })}
         </div>
 
-        <div className="mt-auto flex items-center gap-2.5 rounded-[14px] bg-panel-hover px-3 py-2.5">
-          <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-teal font-display text-sm font-extrabold text-white">
-            {initialsOf(authName)}
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="truncate text-[13px] font-semibold">{authName}</div>
-            <div className="truncate text-xs text-muted">{authEmail}</div>
-          </div>
+        <div
+          className="mt-auto flex items-center gap-2.5 rounded-[14px] px-3 py-2.5"
+          style={{
+            background: page === "profile" ? "rgba(15,163,160,0.14)" : "#16242F",
+            border: `1.5px solid ${page === "profile" ? "#0FA3A0" : "transparent"}`,
+          }}
+        >
+          <button
+            onClick={() => router.push(`/c/${cls.id}/profile`)}
+            title="Profile and account"
+            className="flex min-w-0 flex-1 cursor-pointer items-center gap-2.5 p-0 text-left text-canvas"
+          >
+            <div className="avatar-teal flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl font-display text-sm font-extrabold text-white">
+              {profileInitials(st.profile)}
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-[13px] font-semibold">{authName}</div>
+              <div className="truncate text-xs text-muted">{authEmail}</div>
+            </div>
+          </button>
           <button
             onClick={() => {
               st.set({ signedIn: false });
@@ -200,9 +212,9 @@ export default function ClassLayout({ children }: { children: React.ReactNode })
 
       {/* Main column */}
       <div className="flex min-h-0 min-w-0 flex-col overflow-hidden">
-        <div className="flex flex-shrink-0 items-center justify-between gap-6 border-b border-line bg-card px-8 py-[22px]">
+        <div className="header-frost flex flex-shrink-0 items-center justify-between gap-6 px-8 py-[22px]">
           <div className="min-w-0">
-            <div className="truncate font-display text-[22px] font-extrabold tracking-[-0.4px]">
+            <div className="title-gradient truncate font-display text-[22px] font-extrabold tracking-[-0.4px]">
               {cls.code} · {cls.title}
             </div>
             <div className="mt-[3px] truncate text-[13px] font-medium text-sub">
@@ -216,13 +228,14 @@ export default function ClassLayout({ children }: { children: React.ReactNode })
             >
               <span
                 className="inline-block h-[7px] w-[7px] rounded-full"
-                style={{ background: st.saved ? "#0FA3A0" : "#F5B70A" }}
+                style={{
+                  background: st.saved ? "#0FA3A0" : "#F5B70A",
+                  animation: "ulatPulse 2.4s ease-out infinite",
+                }}
               />
               {st.saved ? "All changes saved · students see them now" : "Saving…"}
             </span>
-            <button className="h-[38px] cursor-pointer whitespace-nowrap rounded-xl border-[1.5px] border-line bg-card px-4 text-[13px] font-bold text-ink hover:border-teal hover:text-teal-text">
-              Export XLSX
-            </button>
+            <ExportMenu clsId={cls.id} />
             <button
               onClick={() => st.set({ tour: { step: 0 }, tourRect: null })}
               title="Product tour"
@@ -243,7 +256,7 @@ export default function ClassLayout({ children }: { children: React.ReactNode })
           </div>
         </div>
 
-        <div className="flex min-h-0 flex-1 flex-col px-8 pb-7 pt-6">{children}</div>
+        <div className="bg-content-v3 flex min-h-0 flex-1 flex-col px-8 pb-7 pt-6">{children}</div>
       </div>
     </div>
   );

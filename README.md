@@ -46,8 +46,11 @@ Attendance with P/L/A/E cycling linked to scores, Students with the full detail
 panel (record, work, remarks, shared view, flags), Sharing (v2.1 account-level
 guardian links: class policy bar, role chips, invite flow), Settings (grading
 editor, scale/passing, transmutation, periods, term grade, consultation hours,
-co-instructors, archive/delete), and the guided product tour (auto-starts once;
-replay from the ? Tour button).
+co-instructors, archive/delete), the guided product tour (auto-starts once;
+replay from the ? Tour button), the v3 visual skin (gradient sidebar, frosted
+header, animated logo), real exports (styled XLSX via xlsx-js-style and an A4
+PDF grade report via html2pdf.js, both with a scope dropdown), and the Profile
+page (draft-based edits applied system-wide, reached from the sidebar card).
 
 Next milestones: the 4-step class wizard (roster import/parsing), XLSX export,
 and the student/guardian mobile views.

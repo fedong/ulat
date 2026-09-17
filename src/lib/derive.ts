@@ -105,3 +105,25 @@ export const initialsOf = (name: string) =>
     .join("")
     .slice(0, 2)
     .toUpperCase();
+
+interface ProfileNameParts {
+  title: string;
+  first: string;
+  last: string;
+  suffix: string;
+  nameStyle: "short" | "full";
+}
+
+/** "Prof. Dolores Rivera, PhD" — used on exports and the profile header. */
+export const profileFullName = (p: ProfileNameParts) =>
+  [p.title, p.first, p.last].filter(Boolean).join(" ") + (p.suffix ? ", " + p.suffix : "");
+
+/** Name as students and guardians see it, following the chosen style. */
+export const profileShownName = (p: ProfileNameParts) => {
+  const full = [p.title, p.first, p.last].filter(Boolean).join(" ");
+  const short = p.title ? p.title + " " + (p.last || p.first) : [p.first, p.last].filter(Boolean).join(" ");
+  return (p.nameStyle === "full" ? full : short) || "Instructor";
+};
+
+export const profileInitials = (p: ProfileNameParts) =>
+  ((((p.first || "")[0] || "") + ((p.last || "")[0] || "")) || "IN").toUpperCase();

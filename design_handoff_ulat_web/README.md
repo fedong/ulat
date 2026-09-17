@@ -5,7 +5,32 @@ Ulat is a Philippine gradebook. Instructors run classes on the web: create a cla
 
 This package covers the **web app** (screen 4a) and the three **phone views** (4b instructor, 4c student, 4d guardian) that read from the same state.
 
-## What changed in this package (v2.1 — Sep 17, 2026)
+
+## What changed in v3 (Sep 17, 2026) — see `Ulat Web v3.dc.html` (canonical; v2 kept for reference)
+1. **Export scope dropdown** on the Export button: Whole gradebook · Current period · Grading groups · Term grades · Attendance. XLSX styling (SheetJS): teal brand header row, class title with instructor name, meta line (section · term · scope · date · passing), dark column headers with white text, alternating row fills, frozen student columns.
+2. **PDF export** (A4 landscape, print-ready, official grade-report styling): school header, meta block, grade table, signature block (Prepared by / Noted by / Approved by). Free tier shows the Ulat mark + footer; paid plans have branding removed.
+3. **Profile settings** (Settings → Profile): title dropdown (Prof. / Dr. / Mr. / Ms. / Mrs. / Engr. / Atty. / none), first name, last name, suffix; Institution card (school, college/department, position, faculty ID, PRC license); Contact card (email, mobile, office); Preferences (language English | Filipino, alerts, weekly digest, co-instructor activity). Edits are **draft-based**: Save / Discard bar under the Contact card; saved values apply system-wide (sidebar user card, header "with …" line, XLSX/PDF headers and signature block, student-facing alerts).
+4. **Visual upgrade (v3 skin)**: sidebar deep-navy gradient with teal aura and amber glow; frosted-glass header with gradient class title; cards use gradient fill + hairline border + two-stage shadow; primary buttons gradient teal with glow and hover lift; row/tile hover feedback. Tokens unchanged otherwise.
+5. **Animated logo** (sign-in panel and sidebar): bubble springs in, trend line draws, arrowhead pops, mark glows. Sign-in hero shows the single line "Built for Philippine grading systems"; button reads **Continue with Google** with the Google "G" mark; email placeholder unchanged.
+
+## Feature inventory (everything in this package)
+Web (instructor)
+- Sign in / sign up (Google, email) · animated brand panel
+- Class wizard: details, schedule slots, level → terms/periods, join code; grading presets (University · Lecture/Lab · DepEd WW/PT/QA · Letter/GPA); groups, components, exam flag, weights validation; scale (1.00–5.00 / % / Letter / GPA), passing mark, at-risk band, transmutation table + base; roster import CSV / XLSX / TXT / PDF + paste, issue flags, dedupe
+- Multi-class sidebar, archive/restore (30-day), delete
+- Overview: stat tiles, standing distribution, histogram, period strip, term so far, component averages, hardest assessments, students to watch
+- Gradebook: per-period tabs, keyboard entry (arrows/Tab/Enter, m = MISSED, e = EXC, undo), transmuted toggle, locked Final periods, live standing
+- Assessments: filters, create (Today/Later, component, period, max, notes), attendance pre-fill, archive with 30-day restore
+- Attendance: sessions (Whole / Lecture / Lab), P→L→A→E cycling, rate colors, sync to same-date assessments
+- Students: filters, add student, detail panel (grade per period, rank, suggestion, Record / Work / Remarks / Shared view tabs), flag for consultation, remarks history
+- Sharing: how-it-works, class policy (Grades/Attendance locked; Missing work / Remarks toggles), consent table with role chips, Ask student / Invite guardian / Remind, inline invite panel, account-level links
+- Settings: grading system, scale & passing, periods, term grade (Average | Cumulative, period weights, Mark final), consultation hours, transmutation, co-instructors with grade/attendance/remark scopes, Profile (v3), this class
+- Export: XLSX with scope dropdown + styling; PDF grade report with signature block and tier-based branding
+- Product tour: 8 stops, spotlight overlay, ? Tour button, first-run auto start
+- Save indicator, confirm dialogs, English/Filipino language prop
+Mobile (Instructor · Student · Guardian) — see design_handoff_ulat_mobile
+
+## What changed in v2.1 (Sep 17, 2026)
 Update an existing implementation by touching only these areas:
 1. **Sharing page** rebuilt around account-level guardian links: how-it-works cards, class policy bar (Grades/Attendance locked, Missing work/Remarks toggles), consent table with separate Guardian · Role · Contact columns, color-coded role chips, multi-guardian rows, pending tag, Ask student / Invite guardian / + Guardian actions with inline invite panel. Old per-student consent scopes and Active/Revoked status are gone.
 2. **Product tour**: welcome card with 8-stop agenda, spotlight stops, finish card with Watch again, **? Tour** button in the header.
@@ -177,7 +202,8 @@ Grade math (port exactly)
 `assets/ulat-mark.svg`, `assets/ulat-mark-white.svg` (logo marks). Icons are inline 24px stroke SVGs (1.8 stroke, round caps). Fonts from Google Fonts.
 
 ## Files
-- `Ulat Web v2.dc.html` — the full web prototype (template + logic), including the Sharing page and tour.
+- `Ulat Web v3.dc.html` — **canonical** web prototype (template + logic): v3 skin, export scope + PDF, profile settings, animated logo.
+- `Ulat Web v2.dc.html` — previous version, kept for diffing.
 - `Ulat Prototype.dc.html` — mobile prototype (instructor / student / guardian phones).
 - `support.js` — runtime needed to open the prototype in a browser; not part of the design.
 - `assets/` — logo marks.
