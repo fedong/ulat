@@ -13,6 +13,22 @@ export const useMounted = () => {
   return mounted;
 };
 
+/**
+ * Browser-tab title. Next streams the route's metadata <title> in after
+ * hydration, which overwrites a plain `document.title =`, so keep watching
+ * <head> and re-assert until the page unmounts.
+ */
+export function usePageTitle(title: string) {
+  useEffect(() => {
+    document.title = title;
+    const ob = new MutationObserver(() => {
+      if (document.title !== title) document.title = title;
+    });
+    ob.observe(document.head, { childList: true, subtree: true, characterData: true });
+    return () => ob.disconnect();
+  }, [title]);
+}
+
 export interface EntitlementCtx {
   ent: Entitlement;
   /** Read-only class ids (FREE over the 2-class limit). */

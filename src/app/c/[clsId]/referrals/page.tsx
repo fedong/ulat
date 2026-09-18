@@ -49,10 +49,7 @@ export default function ReferralsPage() {
   };
 
   return (
-    <div
-      className="-mr-2 flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto pr-2"
-      style={{ animation: "ulatIn .35s ease both" }}
-    >
+    <div className="-mr-2 flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto pr-2">
       <div className="mx-auto w-full grid max-w-[760px] grid-cols-3 gap-3">
         {steps.map(([title, body], i) => (
           <div key={i} className="flex flex-col gap-2 rounded-2xl bg-card px-[18px] py-4 shadow-card">

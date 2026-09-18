@@ -297,10 +297,7 @@ export default function BillingPage({ params }: { params: Promise<{ clsId: strin
   }
 
   return (
-    <div
-      className="-mr-2 flex min-h-0 flex-1 flex-col gap-7 overflow-y-auto pr-2"
-      style={{ animation: "ulatIn .35s ease both" }}
-    >
+    <div className="-mr-2 flex min-h-0 flex-1 flex-col gap-7 overflow-y-auto pr-2">
       {/* Plan strip (only when no banner) */}
       {!hasBanner && (
         <div className="mx-auto w-full flex max-w-[1000px] items-center justify-between gap-4 rounded-[14px] bg-white px-4 py-3" style={{ border: "1px solid rgba(34,48,60,0.06)" }}>

@@ -48,10 +48,7 @@ export default function InvoicesPage({ params }: { params: Promise<{ clsId: stri
   const invoices = [...st.invoices, ...seedInv];
 
   return (
-    <div
-      className="-mr-2 flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto pr-2"
-      style={{ animation: "ulatIn .35s ease both" }}
-    >
+    <div className="-mr-2 flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto pr-2">
       <div className="mx-auto w-full flex max-w-[760px] items-center justify-between gap-4">
         <div className="text-[13px] text-sub">{t.refundPolicy}</div>
         <button
@@ -83,7 +80,7 @@ export default function InvoicesPage({ params }: { params: Promise<{ clsId: stri
                 </div>
               </div>
               <div className="text-right">
-                <div className="text-sm font-bold">{i.net}</div>
+                <div className="text-sm font-bold tabular-nums">{i.net}</div>
                 <div className="text-xs font-semibold" style={{ color: i.color }}>
                   {i.status}
                 </div>

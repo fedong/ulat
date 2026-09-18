@@ -10,7 +10,7 @@ import { PlanBanner } from "@/components/PlanSurfaces";
 import { TourOverlay } from "@/components/TourOverlay";
 import { billingStrings } from "@/lib/billing";
 import { headerMeta } from "@/lib/derive";
-import { useEntitlement, useMounted, usePeriodComputed } from "@/lib/hooks";
+import { useEntitlement, useMounted, usePageTitle, usePeriodComputed } from "@/lib/hooks";
 import { today, useUlat } from "@/lib/store";
 import type { Klass } from "@/lib/types";
 
@@ -48,6 +48,27 @@ export default function ClassLayout({ children }: { children: React.ReactNode })
         useUlat.setState({ entState: v as never });
     } catch {}
   }, []);
+
+  // Browser-tab title tracks the page, e.g. "Gradebook · CS101 · Ulat".
+  const pageForTitle = pathname.split("/").pop() || "overview";
+  const titleNames: Record<string, string> = {
+    overview: "Overview",
+    gradebook: "Gradebook",
+    assessments: "Assessments",
+    attendance: "Attendance",
+    students: "Students",
+    sharing: "Sharing",
+    settings: "Settings",
+    profile: "Profile settings",
+    billing: "Plan & billing",
+    invoices: "Invoices",
+    referrals: "Referrals",
+  };
+  const titleName = titleNames[pageForTitle] || "Overview";
+  const titleAccount = ["profile", "billing", "invoices", "referrals"].includes(pageForTitle);
+  usePageTitle(
+    titleAccount || !cls ? `${titleName} · Ulat` : `${titleName} · ${cls.code} · Ulat`,
+  );
 
   // Auto-start the product tour on first arrival unless already seen.
   // eslint-disable-next-line react-hooks/rules-of-hooks -- stable hook order: this layout always reaches here
@@ -259,7 +280,14 @@ export default function ClassLayout({ children }: { children: React.ReactNode })
 
         <PlanBanner clsId={cls.id} />
 
-        <div className="bg-content-v3 flex min-h-0 flex-1 flex-col px-8 pb-7 pt-6">{children}</div>
+        {/* Keyed by pathname so every page change gets the same soft entrance. */}
+        <div
+          key={pathname}
+          className="bg-content-v3 flex min-h-0 flex-1 flex-col px-8 pb-7 pt-6"
+          style={{ animation: "ulatIn .3s ease both" }}
+        >
+          {children}
+        </div>
       </div>
     </div>
   );

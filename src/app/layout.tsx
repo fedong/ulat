@@ -18,6 +18,7 @@ export const metadata: Metadata = {
   title: "Ulat — Philippine Gradebook",
   description:
     "Run your classes on the web: grading systems, assessments, attendance, and consultation — with synced student and guardian apps.",
+  icons: { icon: "/ulat-mark.svg" },
 };
 
 export default function RootLayout({

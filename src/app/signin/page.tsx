@@ -2,6 +2,7 @@
 
 import { AnimatedLogo, HeroCarousel } from "@/components/AnimatedLogo";
 import { useRouter } from "next/navigation";
+import { usePageTitle } from "@/lib/hooks";
 import { useUlat } from "@/lib/store";
 import { DEMO_INSTRUCTOR } from "@/lib/derive";
 
@@ -11,6 +12,7 @@ const inputCls =
 export default function SignInPage() {
   const router = useRouter();
   const { signup, authError, auth, set } = useUlat();
+  usePageTitle("Sign in · Ulat");
 
   const setA = (k: keyof typeof auth) => (e: React.ChangeEvent<HTMLInputElement>) =>
     set({ auth: { ...auth, [k]: e.target.value }, authError: false });

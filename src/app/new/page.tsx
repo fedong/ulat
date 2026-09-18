@@ -7,7 +7,7 @@ import { ConfirmDialogHost } from "@/components/ConfirmDialogHost";
 import { billingStrings } from "@/lib/billing";
 import { DEMO_INSTRUCTOR, profileShownName } from "@/lib/derive";
 import { scaleLabel, SCALES, shown, standing, txBase } from "@/lib/grading";
-import { useEntitlement, useMounted } from "@/lib/hooks";
+import { useEntitlement, useMounted, usePageTitle } from "@/lib/hooks";
 import { PRESETS, uid } from "@/lib/presets";
 import { profileInitials } from "@/lib/derive";
 import { mkClass } from "@/lib/seed";
@@ -56,6 +56,8 @@ export default function NewClassPage() {
   const [importMsg, setImportMsg] = useState("");
   const [importKind, setImportKind] = useState<"" | "ok" | "warn" | "error" | "busy">("");
   const [rosterSort, setRosterSort] = useState<{ key: keyof WizStudent; dir: "asc" | "desc" } | null>(null);
+
+  usePageTitle("New class · Ulat");
 
   if (!mounted) return <div className="h-dvh bg-canvas" />;
 

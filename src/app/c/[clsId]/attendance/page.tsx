@@ -230,7 +230,7 @@ export default function AttendancePage({ params }: { params: Promise<{ clsId: st
                       </button>
                     );
                   })}
-                  <div className="text-center text-sm font-bold" style={{ color: attColor(rate) }}>
+                  <div className="text-center text-sm font-bold tabular-nums" style={{ color: attColor(rate) }}>
                     {rate}%
                   </div>
                 </div>

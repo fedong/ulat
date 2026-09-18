@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { fmtLong } from "@/lib/billing";
 import { DEMO_INSTRUCTOR, profileFullName, profileInitials } from "@/lib/derive";
@@ -13,6 +14,16 @@ export function AccountMenu({ clsId }: { clsId: string }) {
   const st = useUlat();
   const { ent, activeN, L } = useEntitlement();
   const page = pathname.split("/").pop() || "overview";
+  const menuOpen = st.menuOpen;
+  const set = st.set;
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") set({ menuOpen: false });
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [menuOpen, set]);
 
   const authName = profileFullName(st.profile) || DEMO_INSTRUCTOR.name;
   const authEmail = st.auth.email || DEMO_INSTRUCTOR.email;

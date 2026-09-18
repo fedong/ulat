@@ -265,7 +265,7 @@ export default function GradebookPage({ params }: { params: Promise<{ clsId: str
                           st.set({ focus: key, buffer: "" });
                           gridRef.current?.focus();
                         }}
-                        className="m-1 flex h-[38px] cursor-text items-center justify-center rounded-lg text-sm font-medium"
+                        className="m-1 flex h-[38px] cursor-text items-center justify-center rounded-lg text-sm font-medium tabular-nums transition-colors hover:bg-teal-tint-8"
                         style={{
                           color,
                           outline: focused ? "2px solid #0FA3A0" : "none",
@@ -275,7 +275,7 @@ export default function GradebookPage({ params }: { params: Promise<{ clsId: str
                       </div>
                     );
                   })}
-                  <div className="text-center text-sm font-semibold">{c.pctText}</div>
+                  <div className="text-center text-sm font-semibold tabular-nums">{c.pctText}</div>
                   <div className="flex justify-center">
                     <span
                       className="whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-bold"

@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { usePathname } from "next/navigation";
 import { exportPdf, exportXlsx } from "@/lib/export";
 import { useEntitlement } from "@/lib/hooks";
@@ -10,6 +11,16 @@ export function ExportMenu({ clsId }: { clsId: string }) {
   const cls = useClass(clsId);
   const pathname = usePathname();
   const { ent } = useEntitlement();
+  const exportOpen = st.exportOpen;
+  const set = st.set;
+  useEffect(() => {
+    if (!exportOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") set({ exportOpen: false });
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [exportOpen, set]);
   if (!cls) return null;
   const gs = cls.grading;
   const page = pathname.split("/").pop() || "overview";
@@ -68,7 +79,10 @@ export function ExportMenu({ clsId }: { clsId: string }) {
       {st.exportOpen && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => st.set({ exportOpen: false })} />
-          <div className="absolute right-0 top-[46px] z-[41] flex w-80 flex-col gap-2.5 rounded-2xl border border-line bg-white p-3.5 shadow-[0_16px_40px_rgba(16,29,38,0.18)]">
+          <div
+            className="absolute right-0 top-[46px] z-[41] flex w-80 flex-col gap-2.5 rounded-2xl border border-line bg-white p-3.5 shadow-[0_16px_40px_rgba(16,29,38,0.18)]"
+            style={{ animation: "ulatIn .22s ease both" }}
+          >
             <div className="flex items-center justify-between gap-2 px-0.5">
               <span className="label-caps text-sub">EXPORT</span>
               <div className="flex gap-[3px] rounded-[9px] border border-line bg-canvas p-0.5">

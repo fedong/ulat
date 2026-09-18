@@ -328,8 +328,9 @@ export default function AssessmentsPage({ params }: { params: Promise<{ clsId: s
               <div
                 key={a.id}
                 data-asm={a.id}
-                className="grid h-[50px] grid-cols-[minmax(150px,2fr)_minmax(140px,1.6fr)_90px_70px_56px_90px_32px] items-center gap-2 border-b border-hairline px-[18px] text-sm font-medium text-ink"
-                style={{ background: st.asmId === a.id ? "rgba(15,163,160,0.08)" : "#FFFFFF" }}
+                className={`grid h-[50px] grid-cols-[minmax(150px,2fr)_minmax(140px,1.6fr)_90px_70px_56px_90px_32px] items-center gap-2 border-b border-hairline px-[18px] text-sm font-medium text-ink transition-colors ${
+                  st.asmId === a.id ? "bg-teal-tint-8" : "bg-white hover:bg-canvas"
+                }`}
               >
                 <button
                   onClick={() => st.set({ asmId: a.id })}
