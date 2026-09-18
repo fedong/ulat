@@ -420,6 +420,110 @@ export default function SettingsPage({ params }: { params: Promise<{ clsId: stri
               <div className="text-[13px] leading-[1.5] text-sub">{txNote}</div>
             </div>
           </div>
+          <div className="mt-2 px-0.5">
+            <div className="font-display text-[17px] font-extrabold">Consultation hours</div>
+            <div className="mt-0.5 text-[13px] text-sub">
+              Shown in the student app. Students you flag for consultation are notified with these
+              hours.
+            </div>
+          </div>
+          <div className={cardCls}>
+            {consult.slots.map((s, i) => (
+              <div key={s.id} className="flex flex-col gap-2 border-b border-hairline pb-3">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex gap-1">
+                    {CDAYS.map((d) => {
+                      const on = s.days.includes(d);
+                      return (
+                        <button
+                          key={d}
+                          onClick={() =>
+                            upConsult((c) => ({
+                              slots: c.slots.map((x, j) =>
+                                j === i
+                                  ? {
+                                      ...x,
+                                      days: on
+                                        ? x.days.filter((y) => y !== d)
+                                        : CDAYS.filter((y) => x.days.includes(y) || y === d),
+                                    }
+                                  : x,
+                              ),
+                            }))
+                          }
+                          className="h-[30px] w-[38px] cursor-pointer rounded-lg text-xs font-bold"
+                          style={{
+                            border: `1px solid ${on ? "#0FA3A0" : "#E8E2D6"}`,
+                            background: on ? "#0FA3A0" : "#FFFFFF",
+                            color: on ? "#FFFFFF" : "#5A6672",
+                          }}
+                        >
+                          {d === "Thu" ? "Th" : d[0] === "S" ? "Sa" : d[0]}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <button
+                    onClick={() => upConsult((c) => ({ slots: c.slots.filter((_, j) => j !== i) }))}
+                    className="h-7 w-7 cursor-pointer rounded-lg text-sm font-bold text-faint hover:bg-hairline hover:text-red-text"
+                  >
+                    ×
+                  </button>
+                </div>
+                <div className="grid grid-cols-[auto_auto_1fr] items-center gap-2">
+                  <input
+                    type="time"
+                    value={s.start}
+                    onChange={(e) =>
+                      upConsult((c) => ({
+                        slots: c.slots.map((x, j) => (j === i ? { ...x, start: e.target.value } : x)),
+                      }))
+                    }
+                    className="h-9 rounded-[10px] border-[1.5px] border-line bg-card px-2 text-[13px] font-semibold text-ink outline-none focus:border-teal"
+                  />
+                  <input
+                    type="time"
+                    value={s.end}
+                    onChange={(e) =>
+                      upConsult((c) => ({
+                        slots: c.slots.map((x, j) => (j === i ? { ...x, end: e.target.value } : x)),
+                      }))
+                    }
+                    className="h-9 rounded-[10px] border-[1.5px] border-line bg-card px-2 text-[13px] font-semibold text-ink outline-none focus:border-teal"
+                  />
+                  <input
+                    value={s.where}
+                    onChange={(e) =>
+                      upConsult((c) => ({
+                        slots: c.slots.map((x, j) => (j === i ? { ...x, where: e.target.value } : x)),
+                      }))
+                    }
+                    placeholder="Where, or a meeting link"
+                    className="h-9 min-w-0 rounded-[10px] border-[1.5px] border-line bg-card px-2.5 text-[13px] font-medium text-ink outline-none focus:border-teal"
+                  />
+                </div>
+              </div>
+            ))}
+            <button
+              onClick={() =>
+                upConsult((c) => ({
+                  slots: [...c.slots, { id: uid(), days: [], start: "15:00", end: "16:00", where: "" }],
+                }))
+              }
+              className="h-8 cursor-pointer self-start whitespace-nowrap rounded-full border-[1.5px] border-dashed border-[#D9D3C7] px-3 text-[13px] font-semibold text-teal-text"
+            >
+              + Time slot
+            </button>
+            <input
+              value={consult.note}
+              onChange={(e) => upConsult(() => ({ note: e.target.value }))}
+              placeholder="Note to students, e.g. message me first to confirm"
+              className="h-9 rounded-[10px] border-[1.5px] border-line bg-card px-2.5 text-[13px] font-medium text-ink outline-none focus:border-teal"
+            />
+            <div className="text-xs font-medium leading-[1.5] text-sub">
+              Students see: <b className="text-ink">{consultSummary(cls)}</b>
+            </div>
+          </div>
         </div>
 
         <div className="flex flex-col gap-3">
@@ -562,110 +666,6 @@ export default function SettingsPage({ params }: { params: Promise<{ clsId: stri
             )}
           </div>
 
-          <div className="mt-2 px-0.5">
-            <div className="font-display text-[17px] font-extrabold">Consultation hours</div>
-            <div className="mt-0.5 text-[13px] text-sub">
-              Shown in the student app. Students you flag for consultation are notified with these
-              hours.
-            </div>
-          </div>
-          <div className={cardCls}>
-            {consult.slots.map((s, i) => (
-              <div key={s.id} className="flex flex-col gap-2 border-b border-hairline pb-3">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex gap-1">
-                    {CDAYS.map((d) => {
-                      const on = s.days.includes(d);
-                      return (
-                        <button
-                          key={d}
-                          onClick={() =>
-                            upConsult((c) => ({
-                              slots: c.slots.map((x, j) =>
-                                j === i
-                                  ? {
-                                      ...x,
-                                      days: on
-                                        ? x.days.filter((y) => y !== d)
-                                        : CDAYS.filter((y) => x.days.includes(y) || y === d),
-                                    }
-                                  : x,
-                              ),
-                            }))
-                          }
-                          className="h-[30px] w-[38px] cursor-pointer rounded-lg text-xs font-bold"
-                          style={{
-                            border: `1px solid ${on ? "#0FA3A0" : "#E8E2D6"}`,
-                            background: on ? "#0FA3A0" : "#FFFFFF",
-                            color: on ? "#FFFFFF" : "#5A6672",
-                          }}
-                        >
-                          {d === "Thu" ? "Th" : d[0] === "S" ? "Sa" : d[0]}
-                        </button>
-                      );
-                    })}
-                  </div>
-                  <button
-                    onClick={() => upConsult((c) => ({ slots: c.slots.filter((_, j) => j !== i) }))}
-                    className="h-7 w-7 cursor-pointer rounded-lg text-sm font-bold text-faint hover:bg-hairline hover:text-red-text"
-                  >
-                    ×
-                  </button>
-                </div>
-                <div className="grid grid-cols-[auto_auto_1fr] items-center gap-2">
-                  <input
-                    type="time"
-                    value={s.start}
-                    onChange={(e) =>
-                      upConsult((c) => ({
-                        slots: c.slots.map((x, j) => (j === i ? { ...x, start: e.target.value } : x)),
-                      }))
-                    }
-                    className="h-9 rounded-[10px] border-[1.5px] border-line bg-card px-2 text-[13px] font-semibold text-ink outline-none focus:border-teal"
-                  />
-                  <input
-                    type="time"
-                    value={s.end}
-                    onChange={(e) =>
-                      upConsult((c) => ({
-                        slots: c.slots.map((x, j) => (j === i ? { ...x, end: e.target.value } : x)),
-                      }))
-                    }
-                    className="h-9 rounded-[10px] border-[1.5px] border-line bg-card px-2 text-[13px] font-semibold text-ink outline-none focus:border-teal"
-                  />
-                  <input
-                    value={s.where}
-                    onChange={(e) =>
-                      upConsult((c) => ({
-                        slots: c.slots.map((x, j) => (j === i ? { ...x, where: e.target.value } : x)),
-                      }))
-                    }
-                    placeholder="Where, or a meeting link"
-                    className="h-9 min-w-0 rounded-[10px] border-[1.5px] border-line bg-card px-2.5 text-[13px] font-medium text-ink outline-none focus:border-teal"
-                  />
-                </div>
-              </div>
-            ))}
-            <button
-              onClick={() =>
-                upConsult((c) => ({
-                  slots: [...c.slots, { id: uid(), days: [], start: "15:00", end: "16:00", where: "" }],
-                }))
-              }
-              className="h-8 cursor-pointer self-start whitespace-nowrap rounded-full border-[1.5px] border-dashed border-[#D9D3C7] px-3 text-[13px] font-semibold text-teal-text"
-            >
-              + Time slot
-            </button>
-            <input
-              value={consult.note}
-              onChange={(e) => upConsult(() => ({ note: e.target.value }))}
-              placeholder="Note to students, e.g. message me first to confirm"
-              className="h-9 rounded-[10px] border-[1.5px] border-line bg-card px-2.5 text-[13px] font-medium text-ink outline-none focus:border-teal"
-            />
-            <div className="text-xs font-medium leading-[1.5] text-sub">
-              Students see: <b className="text-ink">{consultSummary(cls)}</b>
-            </div>
-          </div>
         </div>
       </div>
 
