@@ -265,11 +265,36 @@ export default function StudentsPage({ params }: { params: Promise<{ clsId: stri
             confirmLabel: "Flag and notify",
             onConfirm: setFlag,
           });
-    const markConsulted = () =>
+    const first = sr.name.split(",")[1]?.trim().split(" ")[0] || sr.name;
+    const setConsulted = () =>
       st.upCls(cls.id, (x) => ({
         consults: { ...(x.consults || {}), [sr.id]: consulted ? null : Date.now() },
         flags: { ...(x.flags || {}), [sr.id]: false },
       }));
+    // Both directions confirm, mirroring the flag dialog, so a stray click
+    // never silently writes or erases a consultation record.
+    const markConsulted = () =>
+      consulted
+        ? st.confirm({
+            title: "Remove the consulted mark?",
+            body:
+              "The " +
+              new Date(consulted).toLocaleDateString("en-US", { month: "long", day: "numeric" }) +
+              " consultation record for " +
+              sr.name +
+              " will be cleared. The student is not flagged again.",
+            confirmLabel: "Remove mark",
+            onConfirm: setConsulted,
+          })
+        : st.confirm({
+            title: "Mark " + sr.name + " as consulted?",
+            body:
+              "Today is recorded as the last consultation and the flag is cleared. The date stays until you clear it — if " +
+              first +
+              " needs another consultation later, flag them again and the next mark updates the date.",
+            confirmLabel: "Mark as consulted",
+            onConfirm: setConsulted,
+          });
 
     const ci = roster.findIndex((r) => r.id === sr.id);
     const [gRawSd, , , gStatus] = CONSENTS_RAW[ci % CONSENTS_RAW.length];
@@ -614,11 +639,19 @@ export default function StudentsPage({ params }: { params: Promise<{ clsId: stri
           )}
         </div>
         <button
-          onClick={() => {
-            st.upCls(cls.id, (x) => ({ roster: x.roster.filter((r) => r.id !== sr.id) }));
-            const next = roster.find((r) => r.id !== sr.id);
-            st.set({ student: next ? next.id : "" });
-          }}
+          onClick={() =>
+            st.confirm({
+              title: "Remove " + sr.name + " from " + cls.code + "?",
+              body: "Their recorded scores and attendance stay in the gradebook data but are no longer counted or shown. Re-adding the student by the same student number restores them.",
+              confirmLabel: "Remove from class",
+              danger: true,
+              onConfirm: () => {
+                st.upCls(cls.id, (x) => ({ roster: x.roster.filter((r) => r.id !== sr.id) }));
+                const next = roster.find((r) => r.id !== sr.id);
+                st.set({ student: next ? next.id : "" });
+              },
+            })
+          }
           className="mt-1 h-9 cursor-pointer rounded-xl text-[13px] font-semibold text-red-text hover:bg-red-tint-8"
         >
           Remove from class
