@@ -4,6 +4,17 @@ let uidCounter = 0;
 /** Deterministic ids so seeded state is stable across server render and hydration. */
 export const uid = () => "x" + (++uidCounter).toString(36).padStart(6, "0");
 
+/**
+ * Globally-unique id for entities that become database rows (classes,
+ * students, assessments). Only for interaction-time creation — deterministic
+ * uid() stays for module-scope fixtures so SSR hydration matches.
+ */
+export const newId = () =>
+  "u" +
+  Date.now().toString(36) +
+  Math.random().toString(36).slice(2, 8) +
+  Math.random().toString(36).slice(2, 6);
+
 export const TABLE_5PT = (): TableRow[] =>
   (
     [

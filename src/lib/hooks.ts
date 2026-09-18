@@ -45,15 +45,16 @@ export function useEntitlement(): EntitlementCtx {
   const payMethodPref = useUlat((s) => s.payMethodPref);
   const sub = useUlat((s) => s.sub);
   const subCancel = useUlat((s) => s.subCancel);
+  const entApi = useUlat((s) => s.entApi);
   const classes = useUlat((s) => s.classes);
   const editableIds = useUlat((s) => s.editableIds);
   const fil = useUlat((s) => s.profile.lang === "Filipino");
   return useMemo(() => {
-    const ent = getEntitlement(entState, payMethodPref, sub, subCancel);
+    const ent = getEntitlement(entState, payMethodPref, sub, subCancel, entApi);
     const ro = readOnlyIds(ent, classes, editableIds);
     const activeN = classes.filter((c) => !c.archived).length;
     return { ent, ro, activeN, limitHit: ent.tier === "FREE" && activeN >= 2, L: mkL(fil), fil };
-  }, [entState, payMethodPref, sub, subCancel, classes, editableIds, fil]);
+  }, [entState, payMethodPref, sub, subCancel, entApi, classes, editableIds, fil]);
 }
 
 /** Per-student computed grades for the currently selected period. */

@@ -80,6 +80,8 @@ model Class {
   guardianScopes Json @default("{\"Grades\":true,\"Attendance\":true,\"Missing work\":true,\"Remarks\":false}")
   /// { slots: [{id,days,start,end,where}], note }
   consult  Json    @default("{\"slots\":[],\"note\":\"\"}")
+  /// Co-instructors: [{id,name,email,status,groups,attendance,students}].
+  team     Json    @default("[]")
   archived Boolean @default(false)
 
   createdAt DateTime @default(now())

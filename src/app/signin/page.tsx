@@ -1,49 +1,88 @@
 "use client";
 
+import { useState } from "react";
 import { AnimatedLogo, HeroCarousel } from "@/components/AnimatedLogo";
 import { useRouter } from "next/navigation";
+import { ApiError } from "@/lib/api";
 import { usePageTitle } from "@/lib/hooks";
+import { doRegister, doSignIn } from "@/lib/session";
 import { useUlat } from "@/lib/store";
-import { DEMO_INSTRUCTOR } from "@/lib/derive";
+import type { Klass } from "@/lib/types";
 
 const inputCls =
   "h-12 rounded-[14px] border-[1.5px] border-line bg-card px-3.5 text-[15px] font-medium outline-none focus:border-teal placeholder:text-faint";
 
+/** Demo showcase account, seeded by the backend (`prisma db seed`). */
+const DEMO_LOGIN = { email: "d.rivera@univ.edu.ph", pw: "ulat-demo-2026" };
+
 export default function SignInPage() {
   const router = useRouter();
   const { signup, authError, auth, set } = useUlat();
+  const [errMsg, setErrMsg] = useState("");
+  const [busy, setBusy] = useState(false);
   usePageTitle("Sign in · Ulat");
 
   const setA = (k: keyof typeof auth) => (e: React.ChangeEvent<HTMLInputElement>) =>
     set({ auth: { ...auth, [k]: e.target.value }, authError: false });
 
-  const enter = () => {
-    // A sign-up name seeds the profile (title parsed off when present).
-    if (auth.name.trim()) {
-      const parts = auth.name.trim().split(/\s+/);
-      const hasT = /^(Prof|Dr|Mr|Ms|Mrs|Engr|Atty)\.?$/i.test(parts[0]);
-      set({
-        profile: {
-          ...useUlat.getState().profile,
-          title: hasT ? parts[0].replace(/\.?$/, ".") : "",
-          first: (hasT ? parts.slice(1, -1) : parts.slice(0, -1)).join(" "),
-          last: parts[parts.length - 1] || "",
-        },
-      });
+  const enter = (classes: Klass[]) => {
+    set({ authError: false });
+    const first = classes.find((c) => !c.archived) || classes[0];
+    router.push(first ? `/c/${first.id}/overview` : "/new");
+  };
+
+  const fail = (e: unknown) => {
+    setErrMsg(
+      e instanceof ApiError && e.status !== 500
+        ? e.message
+        : "Couldn't reach Ulat. Check your connection and try again.",
+    );
+    set({ authError: true });
+  };
+
+  const run = async (fn: () => Promise<Klass[]>) => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      enter(await fn());
+    } catch (e) {
+      fail(e);
+    } finally {
+      setBusy(false);
     }
-    set({ signedIn: true, authError: false });
-    router.push("/c/cs101/overview");
   };
 
   const signIn = () => {
-    if (!auth.email.includes("@") || !auth.pw) return set({ authError: true });
-    enter();
+    if (!auth.email.includes("@") || !auth.pw) {
+      setErrMsg("Enter your school email and a password to continue.");
+      return set({ authError: true });
+    }
+    void run(() =>
+      signup
+        ? doRegister({
+            email: auth.email,
+            password: auth.pw,
+            school: auth.school,
+            ...nameParts(auth.name),
+          })
+        : doSignIn(auth.email, auth.pw),
+    );
   };
 
-  const signInGoogle = () => {
-    set({ auth: { ...auth, email: auth.email || DEMO_INSTRUCTOR.email } });
-    enter();
-  };
+  // The Google button tours the seeded demo account until OAuth lands.
+  const signInGoogle = () => void run(() => doSignIn(DEMO_LOGIN.email, DEMO_LOGIN.pw));
+
+  /** "Prof. Dolores Rivera" → { title, first, last } for the server profile. */
+  function nameParts(name: string) {
+    const parts = name.trim().split(/\s+/).filter(Boolean);
+    if (!parts.length) return {};
+    const hasT = /^(Prof|Dr|Mr|Ms|Mrs|Engr|Atty)\.?$/i.test(parts[0]);
+    return {
+      title: hasT ? parts[0].replace(/\.?$/, ".") : "",
+      first: (hasT ? parts.slice(1, -1) : parts.slice(0, -1)).join(" "),
+      last: parts[parts.length - 1] || "",
+    };
+  }
 
   return (
     <div className="grid h-dvh grid-cols-[1fr_520px]">
@@ -71,7 +110,8 @@ export default function SignInPage() {
         </div>
         <button
           onClick={signInGoogle}
-          className="flex h-12 cursor-pointer items-center justify-center gap-2.5 rounded-[14px] border-[1.5px] border-line bg-card text-sm font-bold text-ink"
+          disabled={busy}
+          className="flex h-12 cursor-pointer items-center justify-center gap-2.5 rounded-[14px] border-[1.5px] border-line bg-card text-sm font-bold text-ink disabled:opacity-60"
         >
           <svg width={18} height={18} viewBox="0 0 48 48" aria-hidden>
             <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z" />
@@ -118,14 +158,15 @@ export default function SignInPage() {
         />
         {authError && (
           <div className="text-[13px] font-medium text-red-text">
-            Enter your school email and a password to continue.
+            {errMsg || "Enter your school email and a password to continue."}
           </div>
         )}
         <button
           onClick={signIn}
-          className="h-12 cursor-pointer rounded-[14px] bg-teal text-[15px] font-bold text-white"
+          disabled={busy}
+          className="h-12 cursor-pointer rounded-[14px] bg-teal text-[15px] font-bold text-white disabled:opacity-60"
         >
-          {signup ? "Create account" : "Sign in"}
+          {busy ? "One moment…" : signup ? "Create account" : "Sign in"}
         </button>
         <div className="flex justify-between text-[13px] font-medium text-sub">
           <button

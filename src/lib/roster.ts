@@ -1,4 +1,4 @@
-import { uid } from "./presets";
+import { newId } from "./presets";
 import type { StudentRow } from "./types";
 
 const ID = /^(?=.*\d)[A-Z0-9]{1,6}(-[A-Z0-9]{1,6}){1,3}$|^\d{5,12}$/i;
@@ -37,7 +37,7 @@ export function parseRoster(text: string): StudentRow[] {
       const name = first ? `${last}, ${first}` : last;
       const issues: string[] = [];
       if (!no) issues.push("Missing student no.");
-      return { id: uid(), no, name, last, first, mi, issues };
+      return { id: newId(), no, name, last, first, mi, issues };
     })
     .filter((r): r is StudentRow => r !== null && !!r.last);
 }

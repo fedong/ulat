@@ -200,6 +200,120 @@ async function main() {
   ok(cls.scores[cls.roster[2].id]?.[aid] === undefined, "discard cleans auto-carried MISSED");
   ok(cls.scores[ana]?.[aid] === 15, "discard keeps hand-typed scores");
 
+  console.log("students");
+  const addS = await api("POST", `/api/v1/classes/${cid}/students`, {
+    token,
+    body: { id: "qs-extra", no: "4", name: "Diaz, Dan", last: "Diaz", first: "Dan", mi: "" },
+  });
+  ok(addS.status === 201 && addS.body.id === "qs-extra", "student added with client id");
+  const editS = await api("PATCH", `/api/v1/classes/${cid}/students`, {
+    token,
+    body: {
+      studentRowId: "qs-extra",
+      name: "Diaz, Daniel",
+      flagged: true,
+      remark: "Needs consultation",
+      remarkLog: [{ text: "Needs consultation", at: 1758100000000 }],
+      consultedAt: 1758100000000,
+    },
+  });
+  ok(editS.status === 200, "student fields, flag, remark and consult update");
+  cls = (await api("GET", `/api/v1/classes/${cid}`, { token })).body.class;
+  const dan = cls.roster.find((r) => r.id === "qs-extra");
+  ok(dan?.name === "Diaz, Daniel", "roster edit persisted");
+  ok(
+    cls.flags?.["qs-extra"] === true &&
+      cls.remarks["qs-extra"] === "Needs consultation" &&
+      cls.consults?.["qs-extra"] === 1758100000000,
+    "flag, remark and consult round-trip in the Klass shape",
+  );
+  const dropS = await api("DELETE", `/api/v1/classes/${cid}/students`, {
+    token,
+    body: { studentRowId: "qs-extra" },
+  });
+  ok(dropS.status === 200, "student removed (soft)");
+  cls = (await api("GET", `/api/v1/classes/${cid}`, { token })).body.class;
+  ok(cls.roster.length === 3, "removed student leaves the roster");
+
+  console.log("sessions addressed by date+group");
+  const d2 = "2026-09-19";
+  const ses2 = await api("POST", `/api/v1/classes/${cid}/sessions`, {
+    token,
+    body: { date: d2 },
+  });
+  ok(ses2.status === 201, "second session starts");
+  const mark2 = await api("PATCH", `/api/v1/classes/${cid}/sessions`, {
+    token,
+    body: { date: d2, groupId: "", studentRowId: ben, mark: "L" },
+  });
+  ok(mark2.status === 200, "mark set without a session id");
+  cls = (await api("GET", `/api/v1/classes/${cid}`, { token })).body.class;
+  ok(
+    cls.sessions.find((s) => s.date === d2)?.marks[ben] === "L",
+    "date+group addressing hits the right session",
+  );
+  const drop2 = await api("DELETE", `/api/v1/classes/${cid}/sessions`, {
+    token,
+    body: { date: d2, groupId: "" },
+  });
+  ok(drop2.status === 200, "session discarded by date+group");
+
+  console.log("assessment edit / archive / delete");
+  const editA = await api("PATCH", `/api/v1/classes/${cid}/assessments`, {
+    token,
+    body: { assessmentId: aid, name: "Quiz QA v2", max: 25 },
+  });
+  ok(editA.status === 200, "assessment renamed and re-maxed");
+  const arcA = await api("PATCH", `/api/v1/classes/${cid}/assessments`, {
+    token,
+    body: { assessmentId: aid, archived: true, archivedAt: 1758100000000 },
+  });
+  ok(arcA.status === 200, "assessment archived");
+  cls = (await api("GET", `/api/v1/classes/${cid}`, { token })).body.class;
+  ok(
+    !cls.assessments.some((a) => a.id === aid) &&
+      cls.archive.some((a) => a.id === aid && a.archivedAt === 1758100000000),
+    "archived assessment moves to Klass.archive",
+  );
+  ok(cls.scores[ana]?.[aid] === 15, "archived assessment keeps its scores");
+  const resA = await api("PATCH", `/api/v1/classes/${cid}/assessments`, {
+    token,
+    body: { assessmentId: aid, archived: false },
+  });
+  ok(resA.status === 200, "assessment restored");
+  const delA = await api("DELETE", `/api/v1/classes/${cid}/assessments`, {
+    token,
+    body: { assessmentId: aid },
+  });
+  ok(delA.status === 200, "assessment deleted");
+  cls = (await api("GET", `/api/v1/classes/${cid}`, { token })).body.class;
+  ok(
+    !cls.assessments.some((a) => a.id === aid) && cls.scores[ana]?.[aid] === undefined,
+    "deleted assessment takes its scores with it",
+  );
+
+  console.log("class settings + delete");
+  const team = [
+    { id: "tm1", name: "Co Teacher", email: "co@univ.edu.ph", status: "invited", groups: [], attendance: true, students: false },
+  ];
+  const patchC = await api("PATCH", `/api/v1/classes/${cid}`, {
+    token,
+    body: { joinCode: "QAJC01", team },
+  });
+  ok(
+    patchC.body.class.joinCode === "QAJC01" && patchC.body.class.team?.[0]?.id === "tm1",
+    "joinCode and team persist on the class",
+  );
+  const disp = await api("POST", "/api/v1/classes", {
+    token,
+    body: { ...wizard, code: "QA104", joinCode: "" },
+  });
+  ok(disp.status === 201, "disposable class created");
+  const delC = await api("DELETE", `/api/v1/classes/${disp.body.id}`, { token });
+  ok(delC.status === 200, "class deleted");
+  const goneC = await api("GET", `/api/v1/classes/${disp.body.id}`, { token });
+  ok(goneC.status === 404, "deleted class is gone");
+
   console.log("free plan limit");
   const meNow = (await api("GET", "/api/v1/auth/me", { token })).body;
   await prisma.user.update({ where: { id: meNow.user.id }, data: { entState: "FREE" } });

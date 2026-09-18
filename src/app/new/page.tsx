@@ -8,7 +8,8 @@ import { billingStrings } from "@/lib/billing";
 import { DEMO_INSTRUCTOR, profileShownName } from "@/lib/derive";
 import { scaleLabel, SCALES, shown, standing, txBase } from "@/lib/grading";
 import { useEntitlement, useMounted, usePageTitle } from "@/lib/hooks";
-import { PRESETS, uid } from "@/lib/presets";
+import { newId, PRESETS, uid } from "@/lib/presets";
+import { syncCreateClass } from "@/lib/sync";
 import { profileInitials } from "@/lib/derive";
 import { mkClass } from "@/lib/seed";
 import { today, useUlat } from "@/lib/store";
@@ -59,7 +60,11 @@ export default function NewClassPage() {
 
   usePageTitle("New class · Ulat");
 
-  if (!mounted) return <div className="h-dvh bg-canvas" />;
+  if (!mounted || !st.booted) return <div className="h-dvh bg-canvas" />;
+  if (!st.signedIn) {
+    router.replace("/signin");
+    return null;
+  }
 
   const d = draft;
   const gs = d.grading;
@@ -189,7 +194,7 @@ export default function NewClassPage() {
       });
       return;
     }
-    const id = uid();
+    const id = newId();
     const cls = mkClass({
       id,
       code: d.code.trim(),
@@ -202,6 +207,7 @@ export default function NewClassPage() {
       periods: d.periods,
       roster: d.roster,
     });
+    syncCreateClass(cls);
     st.set({
       classes: [...st.classes, cls],
       period: d.periods[0] || "Prelims",

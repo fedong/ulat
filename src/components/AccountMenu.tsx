@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { fmtLong } from "@/lib/billing";
 import { DEMO_INSTRUCTOR, profileFullName, profileInitials } from "@/lib/derive";
 import { useEntitlement } from "@/lib/hooks";
+import { doSignOut } from "@/lib/session";
 import { useUlat } from "@/lib/store";
 
 /** Sidebar account card + pop-up menu (v3.1). Replaces the old profile card. */
@@ -26,7 +27,7 @@ export function AccountMenu({ clsId }: { clsId: string }) {
   }, [menuOpen, set]);
 
   const authName = profileFullName(st.profile) || DEMO_INSTRUCTOR.name;
-  const authEmail = st.auth.email || DEMO_INSTRUCTOR.email;
+  const authEmail = st.email || st.auth.email || DEMO_INSTRUCTOR.email;
   const untilTxt = ent.until ? fmtLong(ent.until) : "";
 
   const planChipTitle = {
@@ -122,7 +123,7 @@ export function AccountMenu({ clsId }: { clsId: string }) {
             <div className="my-1 h-px" style={{ background: "rgba(255,255,255,0.08)" }} />
             <button
               onClick={() => {
-                st.set({ menuOpen: false, signedIn: false });
+                void doSignOut();
                 router.push("/signin");
               }}
               className="flex h-[38px] cursor-pointer items-center rounded-[9px] px-3 text-left text-[13px] font-semibold text-[#B7C0C8] hover:!bg-white/[0.07] hover:text-canvas"

@@ -4,13 +4,14 @@ import { create } from "zustand";
 import {
   getEntitlement,
   readOnlyIds,
+  type Entitlement,
   type EntState,
   type Invoice,
   type PayMethod,
   type PlanCycle,
   type Sub,
 } from "./billing";
-import { seedClasses } from "./seed";
+import { syncClassPatch } from "./sync";
 import type { Grading, GuardianRole, Klass } from "./types";
 
 export interface NewAssessmentDraft {
@@ -64,6 +65,25 @@ export interface Profile {
   pwChanged: string;
 }
 
+/** Empty profile a fresh account starts from (server profile merges on top). */
+export const BLANK_PROFILE: Profile = {
+  title: "",
+  first: "",
+  last: "",
+  suffix: "",
+  nameStyle: "short",
+  school: "",
+  department: "",
+  position: "",
+  facultyId: "",
+  license: "",
+  mobile: "",
+  office: "",
+  lang: "English",
+  notif: { risk: true, digest: true, invites: true },
+  pwChanged: "",
+};
+
 export const DEFAULT_PROFILE: Profile = {
   title: "Prof.",
   first: "Dolores",
@@ -112,6 +132,14 @@ export interface AuthDraft {
 
 interface UlatState {
   signedIn: boolean;
+  /** True once the stored session was checked on load (valid or not). */
+  booted: boolean;
+  /** Entitlement served by /v1/auth/me; null before hydration. */
+  entApi: Entitlement | null;
+  /** A background save failed after retries. */
+  syncError: boolean;
+  /** Signed-in account email (from /v1/auth/me). */
+  email: string;
   signup: boolean;
   authError: boolean;
   auth: AuthDraft;
@@ -184,12 +212,16 @@ let savedTimer: ReturnType<typeof setTimeout> | null = null;
 
 export const useUlat = create<UlatState>((set, get) => ({
   signedIn: false,
+  booted: false,
+  entApi: null,
+  syncError: false,
+  email: "",
   signup: false,
   authError: false,
   auth: { email: "", pw: "", name: "", school: "" },
   showArchived: false,
   archiveOpen: false,
-  classes: seedClasses(),
+  classes: [],
   period: "Semi-finals",
   asmFilter: "All",
   asmId: "a5",
@@ -240,23 +272,33 @@ export const useUlat = create<UlatState>((set, get) => ({
 
   set: (patch) => set(patch),
   upCls: (clsId, fn) => {
+    let synced: { prev: Klass; next: Klass; patch: Partial<Klass> } | null = null;
     set((s) => {
       const c0 = s.classes.find((c) => c.id === clsId);
       if (!c0) return {};
       const patch = fn(c0);
       // Free-plan read-only classes drop grade/assessment/attendance writes.
-      const ent = getEntitlement(s.entState, s.payMethodPref, s.sub, s.subCancel);
+      const ent = getEntitlement(s.entState, s.payMethodPref, s.sub, s.subCancel, s.entApi);
       const ro = readOnlyIds(ent, s.classes, s.editableIds);
       if (ro.has(clsId) && ["scores", "assessments", "sessions"].some((k) => k in patch))
         return {};
+      const next = { ...c0, ...patch };
+      synced = { prev: c0, next, patch };
       return {
-        classes: s.classes.map((c) => (c.id === clsId ? { ...c, ...patch } : c)),
+        classes: s.classes.map((c) => (c.id === clsId ? next : c)),
         saved: false,
       };
     });
+    // Optimistic write applied — mirror it to the API (no-op patches settle
+    // the indicator on a short timer instead).
+    if (synced) {
+      const { prev, next, patch } = synced as { prev: Klass; next: Klass; patch: Partial<Klass> };
+      syncClassPatch(prev, next, patch);
+    }
     if (savedTimer) clearTimeout(savedTimer);
     savedTimer = setTimeout(() => {
-      useUlat.setState({ saved: true });
+      const s = useUlat.getState();
+      if (!s.saved && !s.syncError) useUlat.setState({ saved: true });
     }, 700);
   },
   upGrading: (clsId, fn) => {

@@ -1,6 +1,6 @@
 "use client";
 
-import { PRESETS, uid } from "./presets";
+import { newId, PRESETS, uid } from "./presets";
 import type { Grading } from "./types";
 
 /** Class-wizard draft state and the roster import parser (ported from the prototype). */
@@ -224,7 +224,7 @@ export function parseCells(rowsIn: (string | null | undefined)[][]): WizStudent[
   const out: WizStudent[] = [];
   const push = (no: string, n: ReturnType<typeof splitName>, issues: string[]) =>
     out.push({
-      id: uid(),
+      id: newId(),
       no,
       last: n.last,
       first: n.first,
@@ -415,7 +415,7 @@ export const DEMO_WIZ_ROSTER = (): WizStudent[] =>
     "Aquino, Paolo", "Bautista, Maria", "Dela Cruz, Juan", "Garcia, Jose", "Mendoza, Carlo",
     "Ramos, Nico", "Reyes, Ana", "Santos, Miguel", "Torres, Bea", "Villanueva, Liza",
   ].map((name, i) => ({
-    id: uid(),
+    id: newId(),
     no: "2024-0" + (1102 + i * 13),
     name,
     last: name.split(",")[0].trim(),

@@ -6,6 +6,7 @@ import { consultSummary, DEMO_INSTRUCTOR, honor, initialsOf } from "@/lib/derive
 import { periodOf, periodWeight, SCALES, shown, standing, txBase } from "@/lib/grading";
 import { PRESETS, uid } from "@/lib/presets";
 import { useClass, useUlat } from "@/lib/store";
+import { syncDeleteClass } from "@/lib/sync";
 import type { ScaleKind } from "@/lib/types";
 
 const CDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -136,6 +137,7 @@ export default function SettingsPage({ params }: { params: Promise<{ clsId: stri
       onConfirm: () => {
         const rest = st.classes.filter((c) => c.id !== cls.id);
         const nx = rest.find((c) => !c.archived) || rest[0];
+        syncDeleteClass(cls.id);
         st.set({ classes: rest });
         router.push(nx ? `/c/${nx.id}/overview` : "/new");
       },

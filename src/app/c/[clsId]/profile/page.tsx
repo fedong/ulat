@@ -2,6 +2,7 @@
 
 import { DEMO_INSTRUCTOR, profileFullName, profileInitials, profileShownName } from "@/lib/derive";
 import { useUlat, type Profile } from "@/lib/store";
+import { syncProfile } from "@/lib/sync";
 
 const capsLabel = "label-caps text-sub";
 const inputCls =
@@ -21,7 +22,7 @@ export default function ProfilePage() {
   const st = useUlat();
   const prof = st.profile;
   const draft = st.profileDraft || prof;
-  const authEmail = st.auth.email || DEMO_INSTRUCTOR.email;
+  const authEmail = st.email || st.auth.email || DEMO_INSTRUCTOR.email;
 
   const upDraft = (patch: Partial<Profile>) =>
     st.set({ profileDraft: { ...(st.profileDraft || st.profile), ...patch } });
@@ -31,7 +32,9 @@ export default function ProfilePage() {
   const dirty = JSON.stringify(draft) !== JSON.stringify(prof);
   const save = () => {
     if (!dirty) return;
-    st.set({ profile: st.profileDraft || st.profile, profileDraft: null, profileToast: true });
+    const next = st.profileDraft || st.profile;
+    syncProfile(next);
+    st.set({ profile: next, profileDraft: null, profileToast: true });
     setTimeout(() => useUlat.setState({ profileToast: false }), 2500);
   };
   const discard = () => st.set({ profileDraft: null });

@@ -9,6 +9,17 @@ type Ctx = { params: Promise<{ id: string }> };
 const groupOfComp = (grading: Grading, compId: string) =>
   grading.groups.find((g) => g.comps.some((c) => c.id === compId))?.id ?? null;
 
+/** Sessions are addressed by id, or by (date, groupId) — clients keep no ids. */
+const findSession = (
+  sessions: { id: string; date: string; groupId: string; marks: unknown }[],
+  b: { sessionId?: unknown; date?: unknown; groupId?: unknown },
+) =>
+  b.sessionId
+    ? sessions.find((s) => s.id === String(b.sessionId))
+    : sessions.find(
+        (s) => s.date === String(b.date || "") && s.groupId === String(b.groupId || ""),
+      );
+
 /** Start a session: everyone Present. Idempotent per (date, group). */
 export async function POST(req: NextRequest, ctx: Ctx) {
   const { id } = await ctx.params;
@@ -38,11 +49,10 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
   const r = await loadOwnedClass(req, id);
   if ("error" in r) return r.error === "unauthorized" ? unauthorized() : notFound();
   const b = await req.json().catch(() => null);
-  const sessionId = String(b?.sessionId || "");
   const studentRowId = String(b?.studentRowId || "");
   const mark = String(b?.mark || "");
   if (!["P", "L", "A", "E"].includes(mark)) return badRequest("mark must be P, L, A or E");
-  const session = r.cls.sessions.find((s) => s.id === sessionId);
+  const session = findSession(r.cls.sessions, b || {});
   const student = r.cls.students.find((s) => s.id === studentRowId);
   if (!session || !student) return badRequest("unknown session or student");
 
@@ -53,11 +63,14 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
   const auto: Record<string, string> = { A: "MISSED", E: "EXC" };
   const grading = r.cls.grading as unknown as Grading;
   const linked = r.cls.assessments.filter(
-    (a) => a.date === session.date && (!session.groupId || groupOfComp(grading, a.comp) === session.groupId),
+    (a) =>
+      !a.archivedAt &&
+      a.date === session.date &&
+      (!session.groupId || groupOfComp(grading, a.comp) === session.groupId),
   );
 
   await prisma.$transaction(async (tx) => {
-    await tx.attSession.update({ where: { id: sessionId }, data: { marks } });
+    await tx.attSession.update({ where: { id: session.id }, data: { marks } });
     for (const a of linked) {
       const cur = a.scores.find((sc) => sc.studentRowId === studentRowId)?.value;
       const wasAuto = cur === undefined || cur === auto[prev];
@@ -82,15 +95,17 @@ export async function DELETE(req: NextRequest, ctx: Ctx) {
   const r = await loadOwnedClass(req, id);
   if ("error" in r) return r.error === "unauthorized" ? unauthorized() : notFound();
   const b = await req.json().catch(() => null);
-  const sessionId = String(b?.sessionId || "");
-  const session = r.cls.sessions.find((s) => s.id === sessionId);
+  const session = findSession(r.cls.sessions, b || {});
   if (!session) return badRequest("unknown session");
 
   const marks = session.marks as Record<string, string>;
   const auto: Record<string, string> = { A: "MISSED", E: "EXC" };
   const grading = r.cls.grading as unknown as Grading;
   const linked = r.cls.assessments.filter(
-    (a) => a.date === session.date && (!session.groupId || groupOfComp(grading, a.comp) === session.groupId),
+    (a) =>
+      !a.archivedAt &&
+      a.date === session.date &&
+      (!session.groupId || groupOfComp(grading, a.comp) === session.groupId),
   );
 
   await prisma.$transaction(async (tx) => {
@@ -102,7 +117,7 @@ export async function DELETE(req: NextRequest, ctx: Ctx) {
         if (cur === expect)
           await tx.score.deleteMany({ where: { studentRowId: s.id, assessmentId: a.id } });
       }
-    await tx.attSession.delete({ where: { id: sessionId } });
+    await tx.attSession.delete({ where: { id: session.id } });
   });
   return NextResponse.json({ ok: true });
 }

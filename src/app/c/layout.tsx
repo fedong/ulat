@@ -86,6 +86,17 @@ export default function ClassLayout({ children }: { children: React.ReactNode })
   }, [mounted]);
 
   if (!mounted) return <div className="h-dvh bg-canvas" />;
+  // Wait for the stored session to restore before deciding anything.
+  if (!st.booted)
+    return (
+      <div className="flex h-dvh items-center justify-center bg-canvas">
+        <AnimatedLogo size={56} />
+      </div>
+    );
+  if (!st.signedIn) {
+    router.replace("/signin");
+    return null;
+  }
   if (!cls) {
     router.replace("/");
     return null;
@@ -260,18 +271,20 @@ export default function ClassLayout({ children }: { children: React.ReactNode })
           <div className="flex flex-shrink-0 items-center gap-2.5">
             <span
               className="mr-1.5 inline-flex items-center gap-1.5 whitespace-nowrap text-xs font-medium"
-              style={{ color: st.saved ? "#0B807E" : "#8A6400" }}
+              style={{ color: st.syncError ? "#B4231F" : st.saved ? "#0B807E" : "#8A6400" }}
             >
               <span
                 className="inline-block h-[7px] w-[7px] rounded-full"
                 style={{
-                  background: st.saved ? "#0FA3A0" : "#F5B70A",
+                  background: st.syncError ? "#D64541" : st.saved ? "#0FA3A0" : "#F5B70A",
                   animation: "ulatPulse 2.4s ease-out infinite",
                 }}
               />
-              {st.saved
-                ? L("All changes saved · students see them now", "Naka-save lahat · kita na ng mga estudyante")
-                : L("Saving…", "Sine-save…")}
+              {st.syncError
+                ? L("Some changes didn't save — check your connection", "May hindi na-save — suriin ang koneksyon")
+                : st.saved
+                  ? L("All changes saved · students see them now", "Naka-save lahat · kita na ng mga estudyante")
+                  : L("Saving…", "Sine-save…")}
             </span>
             <ExportMenu clsId={cls.id} />
             <button

@@ -35,8 +35,10 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:3000 — sign in with any email + password (demo auth), or
-"Continue with Google Workspace" to jump straight in.
+Open http://localhost:3000 — the web app runs on the API (set up the database
+below first). Sign in with the demo account, create your own with "New here?
+Create an account", or hit "Continue with Google" to tour the seeded demo
+instructor.
 
 Mobile (Expo):
 
@@ -50,7 +52,7 @@ The splash screen picks the role: Instructor (4b) records scores and
 attendance on the go, Student (4c) is seeded as Ana Reyes across three
 classes, Guardian (4d) is Mrs. Reyes following Ana and Miguel.
 
-API (Phase 1 backend — clients are not wired to it yet):
+API (the web client runs on it; mobile wiring is next):
 
 ```bash
 # PostgreSQL must be running; copy .env.example to .env and fill it in
@@ -58,7 +60,8 @@ cp .env.example .env
 npx prisma migrate dev        # create/update the schema
 npx prisma db seed            # demo instructor + CS101/MTEC305A
 npm run dev                   # API lives beside the web app under /api/v1
-npm run api:test              # end-to-end test against a running server
+npm run api:test              # HTTP-level test against a running server
+node scripts/web-e2e.mjs      # browser E2E (Playwright): sign-in, writes, persistence
 ```
 
 Demo account: `d.rivera@univ.edu.ph` / `ulat-demo-2026` (Pro trial).
@@ -72,8 +75,9 @@ Endpoints (all JSON, `Authorization: Bearer <access>` after auth):
 | `GET/POST /api/v1/classes` | Class summaries; create from the wizard payload (Free plan: 2 active classes → `403 free_limit`) |
 | `GET/PATCH /api/v1/classes/[id]` | Full class in the exact `Klass` shape both clients consume; settings updates |
 | `PUT /api/v1/classes/[id]/scores` | One score cell (`number \| "MISSED" \| "EXC" \| null`), clamped to max; closed period → `409 period_final` |
-| `POST /api/v1/classes/[id]/assessments` | Create with validation + attendance-linked MISSED/EXC prefill |
-| `POST/PATCH/DELETE /api/v1/classes/[id]/sessions` | Start today's session (idempotent, everyone Present), set one mark (A/E carry into same-day assessments unless hand-edited), discard (reverses only auto-carried scores) |
+| `POST/PATCH/DELETE /api/v1/classes/[id]/assessments` | Create with validation + attendance-linked MISSED/EXC prefill; edit; archive/restore; delete (scores cascade) |
+| `POST/PATCH/DELETE /api/v1/classes/[id]/students` | Add to roster (client ids accepted), edit fields/flag/remark/consultation, soft remove |
+| `POST/PATCH/DELETE /api/v1/classes/[id]/sessions` | Start today's session (idempotent, everyone Present), set one mark (A/E carry into same-day assessments unless hand-edited), discard (reverses only auto-carried scores) — addressed by id or `(date, groupId)` |
 
 ## Structure
 
@@ -129,10 +133,19 @@ Guardian 4d (Needs-attention digest, Children → classes → scope-gated Shared
 view, merged Alerts with the weekly report, Me). Tab titles, copy, tokens and
 spacing follow `Ulat Web v3.dc.html`.
 
-Phase 1 of the backend is in: Prisma schema + migrations, owned auth
-(register/login/refresh/logout/me with the entitlement DTO), and the core
-class/scores/assessments/attendance endpoints returning `Klass`-shaped
-payloads, seeded with the demo classes and covered by `npm run api:test`
-(42 checks, including grade-math parity for every seeded student).
+The backend is in and the web client runs on it. Phase 1: Prisma schema +
+migrations, owned auth (register/login/refresh/logout/me with the entitlement
+DTO), and the core class/scores/assessments/attendance endpoints returning
+`Klass`-shaped payloads, seeded with the demo classes. Phase 2: the web app is
+fully wired — real sign-in/sign-up with session restore on reload, classes
+hydrated from the API, and every edit synced optimistically (instant UI, then
+a diff of the store patch becomes granular API calls on an ordered retrying
+queue; the header indicator turns red if a save ultimately fails). Roster,
+remarks/flags/consults, assessment archive, co-instructors, join codes and
+class deletion gained endpoints along the way, and entitlement now comes from
+`/v1/auth/me` (the simulated checkout still overrides it locally until
+payments land). Covered by `npm run api:test` (63 HTTP checks) and
+`scripts/web-e2e.mjs` (browser: sign-in, persistence across reloads, wizard
+class creation on a fresh account).
 
-Next milestone: wire both clients to the shared API.
+Next milestone: wire the mobile app to the API, then sharing/guardian invites.

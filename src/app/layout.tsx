@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Gabarito, Figtree } from "next/font/google";
+import { AuthBoot } from "@/components/AuthBoot";
 import "./globals.css";
 
 const gabarito = Gabarito({
@@ -35,6 +36,7 @@ export default function RootLayout({
         suppressHydrationWarning
         className={`${gabarito.variable} ${figtree.variable} antialiased`}
       >
+        <AuthBoot />
         {children}
       </body>
     </html>

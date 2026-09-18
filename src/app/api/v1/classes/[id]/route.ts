@@ -21,9 +21,10 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
   if ("error" in r) return r.error === "unauthorized" ? unauthorized() : notFound();
   const b = await req.json().catch(() => ({}));
   const data: Record<string, unknown> = {};
-  for (const k of ["code", "title", "section", "term", "schedule"] as const)
+  for (const k of ["code", "title", "section", "term", "schedule", "joinCode"] as const)
     if (typeof b[k] === "string") data[k] = b[k];
   if (Array.isArray(b.periods)) data.periods = b.periods.map(String);
+  if (Array.isArray(b.team)) data.team = b.team;
   for (const k of ["grading", "closed", "guardianScopes", "consult"] as const)
     if (b[k] && typeof b[k] === "object") data[k] = b[k];
   if (typeof b.archived === "boolean") data.archived = b.archived;
@@ -33,4 +34,13 @@ export async function PATCH(req: NextRequest, ctx: Ctx) {
     include: classInclude,
   });
   return NextResponse.json({ class: toKlass(updated) });
+}
+
+/** Delete the class permanently (students, assessments, scores, sessions cascade). */
+export async function DELETE(req: NextRequest, ctx: Ctx) {
+  const { id } = await ctx.params;
+  const r = await loadOwnedClass(req, id);
+  if ("error" in r) return r.error === "unauthorized" ? unauthorized() : notFound();
+  await prisma.class.delete({ where: { id } });
+  return NextResponse.json({ ok: true });
 }

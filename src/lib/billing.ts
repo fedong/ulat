@@ -51,7 +51,10 @@ export function getEntitlement(
   demoMethod: PayMethod,
   sub: Sub | null,
   subCancel: boolean,
+  /** Live entitlement from /v1/auth/me — wins unless a local checkout sim (`sub`) overrides. */
+  api?: Entitlement | null,
 ): Entitlement {
+  if (api && !sub) return { ...api, autoRenew: api.autoRenew && !subCancel };
   const base: Omit<Entitlement, "autoRenew"> = sub
     ? { tier: "PRO", state: "Active", until: new Date(sub.until), method: sub.method, plan: sub.plan }
     : demoState === "Trialing"

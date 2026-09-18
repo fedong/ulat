@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { use, useEffect, useRef, useState } from "react";
 import { fmtDate } from "@/lib/derive";
 import { compById, compPath } from "@/lib/grading";
-import { uid } from "@/lib/presets";
+import { newId } from "@/lib/presets";
 import { today, useClass, useUlat } from "@/lib/store";
 import type { Assessment, Klass, Session } from "@/lib/types";
 
@@ -172,7 +172,7 @@ export default function AssessmentsPage({ params }: { params: Promise<{ clsId: s
 
   const createNa = () => {
     if (!naOk) return;
-    const id = uid();
+    const id = newId();
     st.upCls(cls.id, (c) => {
       const ses = c.sessions.find((s) => linked(c, s, { date: st.na.date, comp: naComp }));
       const scores = { ...c.scores };

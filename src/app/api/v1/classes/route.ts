@@ -42,11 +42,16 @@ export async function POST(req: NextRequest) {
       );
   }
 
-  const roster: { no: string; name: string; last: string; first: string; mi?: string }[] =
+  const roster: { id?: string; no: string; name: string; last: string; first: string; mi?: string }[] =
     Array.isArray(b.roster) ? b.roster : [];
+  // Client-generated ids keep the optimistic UI's references valid.
+  const ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
+  const clientId = String(b.id || "");
+  if (clientId && !ID_RE.test(clientId)) return badRequest("invalid id");
 
   const cls = await prisma.class.create({
     data: {
+      ...(clientId ? { id: clientId } : {}),
       ownerId: user.id,
       code,
       title,
@@ -58,6 +63,7 @@ export async function POST(req: NextRequest) {
       grading: b.grading,
       students: {
         create: roster.map((r) => ({
+          ...(r.id && ID_RE.test(String(r.id)) ? { id: String(r.id) } : {}),
           no: String(r.no || ""),
           name: String(r.name || ""),
           last: String(r.last || ""),

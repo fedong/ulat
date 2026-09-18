@@ -15,11 +15,8 @@ export type FullClass = Class & {
 
 export const classInclude = {
   students: { where: { removedAt: null }, orderBy: { name: "asc" as const } },
-  assessments: {
-    where: { archivedAt: null },
-    orderBy: { date: "asc" as const },
-    include: { scores: true },
-  },
+  // Archived assessments ride along and are split into Klass.archive below.
+  assessments: { orderBy: { date: "asc" as const }, include: { scores: true } },
   sessions: { orderBy: [{ date: "asc" as const }, { groupId: "asc" as const }] },
 };
 
@@ -72,16 +69,29 @@ export function toKlass(c: FullClass): Klass {
       mi: s.mi,
       issues: [],
     })),
-    assessments: c.assessments.map((a) => ({
-      id: a.id,
-      name: a.name,
-      comp: a.comp,
-      period: a.period,
-      max: a.max,
-      date: a.date,
-      notes: a.notes || undefined,
-    })),
-    archive: [],
+    assessments: c.assessments
+      .filter((a) => !a.archivedAt)
+      .map((a) => ({
+        id: a.id,
+        name: a.name,
+        comp: a.comp,
+        period: a.period,
+        max: a.max,
+        date: a.date,
+        notes: a.notes || undefined,
+      })),
+    archive: c.assessments
+      .filter((a) => a.archivedAt)
+      .map((a) => ({
+        id: a.id,
+        name: a.name,
+        comp: a.comp,
+        period: a.period,
+        max: a.max,
+        date: a.date,
+        notes: a.notes || undefined,
+        archivedAt: a.archivedAt!.getTime(),
+      })),
     scores,
     sessions: c.sessions.map((s) => ({
       date: s.date,
@@ -93,6 +103,7 @@ export function toKlass(c: FullClass): Klass {
     flags,
     consults,
     consult: c.consult as unknown as Klass["consult"],
+    team: c.team as unknown as Klass["team"],
     archived: c.archived,
     guardianScopes: c.guardianScopes as Record<string, boolean>,
   };
