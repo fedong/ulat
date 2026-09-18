@@ -2,11 +2,14 @@ import React, { useEffect, useRef, useState } from "react";
 import {
   Animated,
   Easing,
+  LayoutAnimation,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
+  UIManager,
   View,
   type PressableProps,
   type StyleProp,
@@ -20,6 +23,11 @@ import Svg, { Circle, Path, Rect } from "react-native-svg";
 import { ContentBg } from "./brand";
 import { C, F, cardShadow } from "./theme";
 import type { UpcomingItem } from "./demo";
+
+// Android (old architecture) needs LayoutAnimation switched on once.
+if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 /* ---------- press feedback (web: button:active scale) ---------- */
 
@@ -374,16 +382,15 @@ export function PhoneShell({
   children,
   tabBar,
   toast,
-  screenKey,
 }: {
   title: string;
   sub: string;
   children: React.ReactNode;
   tabBar: React.ReactNode;
   toast?: string | null;
-  /** Changing this key replays the content entrance (tab switches). */
-  screenKey?: string;
 }) {
+  // Entrance plays once when the role screen mounts. Tab and chip switches
+  // inside a role are instant, per the handoff ("Tab switching is instant").
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: C.canvas }} edges={["top", "left", "right"]}>
       <StatusBar style="dark" />
@@ -393,7 +400,7 @@ export function PhoneShell({
         contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 10, paddingBottom: 20 }}
         showsVerticalScrollIndicator={false}
       >
-        <FadeInView key={screenKey} style={{ gap: 14 }}>
+        <FadeInView style={{ gap: 14 }}>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
             <View style={{ minWidth: 0 }}>
               <Text style={{ fontFamily: F.d800, fontSize: 20, letterSpacing: -0.3, color: C.ink }}>
@@ -409,6 +416,15 @@ export function PhoneShell({
       {tabBar}
     </SafeAreaView>
   );
+}
+
+/** Animate the next layout change (e.g. cards swapping places). No-op on web. */
+export function animateNextLayout() {
+  try {
+    LayoutAnimation.configureNext(LayoutAnimation.create(220, "easeInEaseOut", "opacity"));
+  } catch {
+    /* react-native-web has no LayoutAnimation */
+  }
 }
 
 const s = StyleSheet.create({

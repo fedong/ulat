@@ -45,20 +45,27 @@ import {
 const CARD_W = 260;
 const CARD_GAP = 10;
 
-/** Carousel class card: scale/opacity spring to the selected state (web: 0.25s ease). */
+const CARD_STEP = CARD_W + CARD_GAP;
+
+/**
+ * Pager-style class card: scale and opacity follow the live scroll position
+ * (like Flutter's PageView), so whichever card sits in the center reads as
+ * active while you swipe; releasing makes it the selected class.
+ */
 function ClassCard({
+  index,
+  scrollX,
   on,
   children,
   onPress,
 }: {
+  index: number;
+  scrollX: Animated.Value;
   on: boolean;
   children: React.ReactNode;
   onPress: () => void;
 }) {
-  const v = useRef(new Animated.Value(on ? 1 : 0)).current;
-  useEffect(() => {
-    Animated.spring(v, { toValue: on ? 1 : 0, friction: 8, tension: 80, useNativeDriver: true }).start();
-  }, [on, v]);
+  const inputRange = [(index - 1) * CARD_STEP, index * CARD_STEP, (index + 1) * CARD_STEP];
   return (
     <Pressable onPress={onPress}>
       <Animated.View
@@ -72,8 +79,20 @@ function ClassCard({
             gap: 1,
             borderColor: on ? C.teal : C.line,
             backgroundColor: on ? C.tealTint10 : "#FFFFFF",
-            opacity: v.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1] }),
-            transform: [{ scale: v.interpolate({ inputRange: [0, 1], outputRange: [0.88, 1] }) }],
+            opacity: scrollX.interpolate({
+              inputRange,
+              outputRange: [0.55, 1, 0.55],
+              extrapolate: "clamp",
+            }),
+            transform: [
+              {
+                scale: scrollX.interpolate({
+                  inputRange,
+                  outputRange: [0.9, 1, 0.9],
+                  extrapolate: "clamp",
+                }),
+              },
+            ],
           },
           on && selectedShadow,
         ]}
@@ -101,6 +120,7 @@ export default function InstructorScreen() {
   const activeCls = st.classes.filter((c) => !c.archived);
   const fil = st.lang === "Filipino";
   const carouselRef = useRef<ScrollView>(null);
+  const carouselX = useRef(new Animated.Value(0)).current;
 
   const asmsP = useMemo(
     () => cls.assessments.filter((a) => a.period === st.period),
@@ -315,9 +335,13 @@ export default function InstructorScreen() {
   }[st.ptabI];
   const sub = cls.code + " · " + cls.title + " · " + cls.section;
 
-  const pickCls = (c: Klass, idx: number) => {
+  const activateCls = (c: Klass) => {
+    if (c.id === st.clsId) return;
     st.set({ clsId: c.id, phoneAsmId: null, phoneSession: null, period: c.periods[0] });
-    carouselRef.current?.scrollTo({ x: idx * (CARD_W + CARD_GAP), animated: true });
+  };
+  const pickCls = (c: Klass, idx: number) => {
+    activateCls(c);
+    carouselRef.current?.scrollTo({ x: idx * CARD_STEP, animated: true });
   };
 
   const pa = cls.assessments.find((a) => a.id === st.phoneAsmId) || null;
@@ -331,43 +355,58 @@ export default function InstructorScreen() {
   const periodClosed = !!closedP[st.period];
 
   /* ---- entitlement (demo: Trialing) ---- */
-  const planTitle = "Pro · trial";
-  const planSub = fil ? "Libre hanggang February 14, 2027" : "Free until February 14, 2027";
+  const trialDays = Math.max(0, Math.round((Date.parse("2027-02-14") - Date.now()) / 864e5));
+  const planTitle = fil
+    ? "Nasa Pro ka — libre hanggang February 14"
+    : "You're on Pro — free until February 14";
+  const planSub = fil ? trialDays + " araw pa" : trialDays + " days left";
 
   return (
     <PhoneShell
       title={title}
       sub={sub}
       toast={st.phoneToast}
-      screenKey={st.ptabI + (pa ? ":" + pa.id : "")}
       tabBar={<TabBar tabs={tabs} active={st.ptabI} onPick={(k) => st.set({ ptabI: k })} />}
     >
       {/* ============ CLASSES + NEW ASSESSMENT ============ */}
       {st.ptabI === "classes" && (
         <>
-          <View style={s.planCard}>
-            <View style={{ minWidth: 0 }}>
-              <Text style={{ fontFamily: F.b700, fontSize: 13, color: C.ink }}>{planTitle}</Text>
-              <Text style={{ fontFamily: F.b400, fontSize: 12, color: C.sub, marginTop: 1 }}>
+          <View style={s.planBanner}>
+            <View style={s.planDot} />
+            <View style={{ minWidth: 0, flexShrink: 1 }}>
+              <Text style={{ fontFamily: F.b700, fontSize: 13, color: C.tealText }}>{planTitle}</Text>
+              <Text style={{ fontFamily: F.b500, fontSize: 12, color: C.tealText, marginTop: 1, opacity: 0.85 }}>
                 {planSub}
               </Text>
             </View>
           </View>
 
           <View style={{ marginHorizontal: -20, gap: 10 }}>
-            <ScrollView
+            <Animated.ScrollView
               ref={carouselRef}
               horizontal
               showsHorizontalScrollIndicator={false}
-              snapToInterval={CARD_W + CARD_GAP}
+              snapToInterval={CARD_STEP}
               decelerationRate="fast"
+              scrollEventThrottle={16}
+              onScroll={Animated.event([{ nativeEvent: { contentOffset: { x: carouselX } } }], {
+                useNativeDriver: true,
+              })}
+              onMomentumScrollEnd={(e) => {
+                // Whichever card settles in the center becomes the active class.
+                const idx = Math.max(
+                  0,
+                  Math.min(activeCls.length - 1, Math.round(e.nativeEvent.contentOffset.x / CARD_STEP)),
+                );
+                if (activeCls[idx]) activateCls(activeCls[idx]);
+              }}
               contentContainerStyle={{ gap: CARD_GAP, paddingHorizontal: 65, paddingVertical: 8, alignItems: "center" }}
             >
               {activeCls.map((c, i) => {
                 const on = c.id === cls.id;
                 const team = (c.team || []).filter((m) => m.status === "active");
                 return (
-                  <ClassCard key={c.id} on={on} onPress={() => pickCls(c, i)}>
+                  <ClassCard key={c.id} index={i} scrollX={carouselX} on={on} onPress={() => pickCls(c, i)}>
                     <Text numberOfLines={1} style={{ fontFamily: F.d800, fontSize: 15, color: C.ink }}>
                       {c.code} · {c.section}
                     </Text>
@@ -378,7 +417,7 @@ export default function InstructorScreen() {
                   </ClassCard>
                 );
               })}
-            </ScrollView>
+            </Animated.ScrollView>
             <View style={{ flexDirection: "row", justifyContent: "center", gap: 6 }}>
               {activeCls.map((c, i) => {
                 const on = c.id === cls.id;
@@ -724,19 +763,16 @@ export default function InstructorScreen() {
       {/* ============ ATTENDANCE ============ */}
       {st.ptabI === "attend" && (
         <>
-          <View style={{ flexDirection: "row", gap: 8 }}>
+          {/* One full-width button per group — stacked, so "Start today ·
+              Laboratory" never fights for half a row. */}
+          <View style={{ gap: 8 }}>
             {(multiGroup ? gs.groups.map((g) => [g.id, g.name] as const) : [[null, ""] as const]).map(
               ([gid, nm]) => {
                 const open = cls.sessions.some(
                   (x) => x.date === todayIso() && (x.group || null) === gid,
                 );
                 return open ? (
-                  <PressableScale
-                    key={String(gid)}
-                    onPress={() => startToday(gid)}
-                    scaleTo={0.985}
-                    style={{ flex: 1 }}
-                  >
+                  <PressableScale key={String(gid)} onPress={() => startToday(gid)} scaleTo={0.985}>
                     <View
                       style={{
                         height: 48,
@@ -747,16 +783,15 @@ export default function InstructorScreen() {
                       }}
                     >
                       <Text numberOfLines={1} style={{ fontFamily: F.b700, fontSize: 14, color: "#FFFFFF" }}>
-                        {nm ? nm + " is open" : "Today is open"}
+                        {nm ? "Today's " + nm + " session is open" : "Today's session is open"}
                       </Text>
                     </View>
                   </PressableScale>
                 ) : (
                   <PrimaryButton
                     key={String(gid)}
-                    label={nm ? "Start today · " + nm : "Start today's session"}
+                    label={nm ? "Start today's " + nm + " session" : "Start today's session"}
                     onPress={() => startToday(gid)}
-                    style={{ flex: 1 }}
                   />
                 );
               },
@@ -999,17 +1034,26 @@ export default function InstructorScreen() {
 }
 
 const s = StyleSheet.create({
-  planCard: {
+  // Plan status banner: tinted like the web PlanBanner so it reads as a
+  // reminder, not just another card (teal = trial/active; amber and red
+  // variants apply for grace / past-due states).
+  planBanner: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
     gap: 10,
     paddingHorizontal: 14,
     paddingVertical: 10,
     borderRadius: 14,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: C.tealTint10,
     borderWidth: 1,
-    borderColor: C.line,
+    borderColor: "rgba(15,163,160,0.3)",
+  },
+  planDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 999,
+    backgroundColor: C.teal,
+    flexShrink: 0,
   },
   label: { fontFamily: F.b700, fontSize: 11, letterSpacing: 0.6, color: C.sub },
   input: {

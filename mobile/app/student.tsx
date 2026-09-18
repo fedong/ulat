@@ -25,6 +25,7 @@ import { currentPeriodOf } from "@/live";
 import { useUlat, type STab } from "@/store";
 import { C, F } from "@/theme";
 import {
+  animateNextLayout,
   Card,
   Chip,
   PhoneShell,
@@ -221,7 +222,6 @@ export default function StudentScreen() {
     <PhoneShell
       title={title}
       sub={sub}
-      screenKey={st.ptabS + ":" + sCls.code + ":" + sFocus.code}
       tabBar={<TabBar tabs={tabs} active={st.ptabS} onPick={(k) => st.set({ ptabS: k })} />}
     >
       {/* ============ HOME ============ */}
@@ -282,7 +282,11 @@ export default function StudentScreen() {
                   key={x.code}
                   scaleTo={0.96}
                   style={{ flex: 1 }}
-                  onPress={() => st.set({ sFocusCode: x.code })}
+                  onPress={() => {
+                    // The tapped tile and the expanded card trade places.
+                    animateNextLayout();
+                    st.set({ sFocusCode: x.code });
+                  }}
                 >
                   <Card style={{ borderRadius: 16, paddingHorizontal: 14, paddingVertical: 12, gap: 2 }}>
                     <Text style={{ fontFamily: F.b700, fontSize: 12, color: C.sub }}>{x.code}</Text>
@@ -550,7 +554,8 @@ export default function StudentScreen() {
                 </Card>
               )}
               <Text style={{ fontFamily: F.b400, fontSize: 12, color: C.sub, paddingHorizontal: 4, lineHeight: 18 }}>
-                Recorded by {sCls.instructor} in their own Ulat class.
+                Recorded by {sCls.instructor} in their own Ulat class — other instructors share the
+                summary only, so component breakdowns appear just for classes graded here.
               </Text>
             </>
           )}
@@ -558,27 +563,24 @@ export default function StudentScreen() {
       )}
 
       {/* ============ ALERTS ============ */}
+      {/* The header already says Alerts, so each item stands on its own. */}
       {st.ptabS === "alerts" && (
-        <Card style={{ gap: 12 }}>
-          <SectionTitle>Alerts</SectionTitle>
+        <>
           {alerts.length === 0 && (
-            <Text style={{ fontFamily: F.b400, fontSize: 13, color: C.sub }}>
-              Nothing new. You are up to date.
-            </Text>
+            <View style={s.emptyBox}>
+              <Text style={{ fontFamily: F.b500, fontSize: 13, color: C.sub, textAlign: "center" }}>
+                Nothing new. You are up to date.
+              </Text>
+            </View>
           )}
           {alerts.map((r, i) => (
-            <View
-              key={i}
-              style={{
-                gap: 3,
-                paddingHorizontal: 14,
-                paddingVertical: 12,
-                borderRadius: 14,
-                backgroundColor: r.bg,
-                borderWidth: 1,
-                borderColor: C.hairline,
-              }}
-            >
+            <Card key={i} style={{ gap: 3, paddingHorizontal: 16, paddingVertical: 13, borderRadius: 16 }}>
+              {r.bg !== "#FFFFFF" && (
+                <View
+                  pointerEvents="none"
+                  style={[StyleSheet.absoluteFill, { backgroundColor: r.bg, borderRadius: 16 }]}
+                />
+              )}
               <View style={{ flexDirection: "row", justifyContent: "space-between", gap: 8 }}>
                 <Text style={{ fontFamily: F.b700, fontSize: 13, color: r.color, flexShrink: 1 }}>
                   {r.title}
@@ -590,9 +592,9 @@ export default function StudentScreen() {
               <Text style={{ fontFamily: F.b400, fontSize: 13, color: C.ink, lineHeight: 19 }}>
                 {r.body}
               </Text>
-            </View>
+            </Card>
           ))}
-        </Card>
+        </>
       )}
 
       {/* ============ ME ============ */}
@@ -673,6 +675,13 @@ const s = StyleSheet.create({
     borderRadius: 16,
     paddingHorizontal: 16,
     paddingVertical: 14,
+  },
+  emptyBox: {
+    borderWidth: 1.5,
+    borderStyle: "dashed",
+    borderColor: C.line,
+    borderRadius: 16,
+    padding: 20,
   },
   shareChip: {
     paddingHorizontal: 10,

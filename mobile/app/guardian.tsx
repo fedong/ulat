@@ -199,7 +199,6 @@ export default function GuardianScreen() {
     <PhoneShell
       title={title}
       sub={sub}
-      screenKey={st.ptabG + ":" + String(st.gChild) + ":" + String(st.gCls)}
       tabBar={<TabBar tabs={tabs} active={st.ptabG} onPick={(k) => st.set({ ptabG: k })} />}
     >
       {/* ============ HOME ============ */}
@@ -316,22 +315,17 @@ export default function GuardianScreen() {
       )}
 
       {/* ============ ALERTS ============ */}
+      {/* The header already says Alerts, so each item stands on its own. */}
       {st.ptabG === "alerts" && (
-        <Card style={{ gap: 12 }}>
-          <SectionTitle>Alerts</SectionTitle>
+        <>
           {alerts.map((r, i) => (
-            <View
-              key={i}
-              style={{
-                gap: 3,
-                paddingHorizontal: 14,
-                paddingVertical: 12,
-                borderRadius: 14,
-                backgroundColor: r.bg,
-                borderWidth: 1,
-                borderColor: C.hairline,
-              }}
-            >
+            <Card key={i} style={{ gap: 3, paddingHorizontal: 16, paddingVertical: 13, borderRadius: 16 }}>
+              {r.bg !== "#FFFFFF" && (
+                <View
+                  pointerEvents="none"
+                  style={[StyleSheet.absoluteFill, { backgroundColor: r.bg, borderRadius: 16 }]}
+                />
+              )}
               <View style={{ flexDirection: "row", justifyContent: "space-between", gap: 8 }}>
                 <Text style={{ fontFamily: F.b700, fontSize: 13, color: r.color, flexShrink: 1 }}>
                   {r.title}
@@ -343,9 +337,9 @@ export default function GuardianScreen() {
               <Text style={{ fontFamily: F.b400, fontSize: 13, color: C.ink, lineHeight: 19 }}>
                 {r.body}
               </Text>
-            </View>
+            </Card>
           ))}
-        </Card>
+        </>
       )}
 
       {/* ============ ME ============ */}
