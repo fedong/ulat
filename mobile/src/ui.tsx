@@ -313,7 +313,13 @@ export function BackPill({ label, onPress }: { label: string; onPress: () => voi
  * Floating toast: hovers above the tab bar, springs in, fades out. It never
  * takes part in the layout, so content doesn't jump when it appears.
  */
-export function Toast({ text }: { text: string | null }) {
+export function Toast({
+  text,
+  action,
+}: {
+  text: string | null;
+  action?: { label: string; run: () => void } | null;
+}) {
   const [shown, setShown] = useState<string | null>(null);
   const v = useRef(new Animated.Value(0)).current;
   useEffect(() => {
@@ -329,7 +335,7 @@ export function Toast({ text }: { text: string | null }) {
   if (!shown) return null;
   return (
     <Animated.View
-      pointerEvents="none"
+      pointerEvents="box-none"
       style={[
         s.toast,
         {
@@ -341,10 +347,17 @@ export function Toast({ text }: { text: string | null }) {
         },
       ]}
     >
-      <View style={s.toastDot}>
+      <View pointerEvents="none" style={s.toastDot}>
         <Text style={{ fontFamily: F.d800, fontSize: 12, color: "#FFFFFF" }}>✓</Text>
       </View>
-      <Text style={s.toastText}>{shown}</Text>
+      <Text pointerEvents="none" style={s.toastText}>
+        {shown}
+      </Text>
+      {!!text && action && (
+        <Pressable onPress={action.run} hitSlop={10} style={s.toastActionBtn}>
+          <Text style={{ fontFamily: F.b700, fontSize: 13, color: "#7FD6D4" }}>{action.label}</Text>
+        </Pressable>
+      )}
     </Animated.View>
   );
 }
@@ -389,12 +402,14 @@ export function PhoneShell({
   children,
   tabBar,
   toast,
+  toastAction,
 }: {
   title: string;
   sub: string;
   children: React.ReactNode;
   tabBar: React.ReactNode;
   toast?: string | null;
+  toastAction?: { label: string; run: () => void } | null;
 }) {
   // Entrance plays once when the role screen mounts. Tab and chip switches
   // inside a role are instant, per the handoff ("Tab switching is instant").
@@ -419,7 +434,7 @@ export function PhoneShell({
           {children}
         </FadeInView>
       </ScrollView>
-      <Toast text={toast ?? null} />
+      <Toast text={toast ?? null} action={toastAction} />
       {tabBar}
     </SafeAreaView>
   );
@@ -532,6 +547,12 @@ const s = StyleSheet.create({
     justifyContent: "center",
   },
   toastText: { fontFamily: F.b600, fontSize: 13, color: C.canvas, lineHeight: 18, flex: 1 },
+  toastActionBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 9,
+    backgroundColor: "rgba(255,255,255,0.08)",
+  },
   upRow: {
     flexDirection: "row",
     gap: 12,

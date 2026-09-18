@@ -29,6 +29,7 @@ interface UlatMobile {
   phoneAsmId: string | null;
   phoneSession: number | null;
   phoneToast: string | null;
+  phoneToastAct: { label: string; run: () => void } | null;
   na: NaDraft;
 
   // Student (4c) — the demo student account (Ana Reyes).
@@ -44,7 +45,7 @@ interface UlatMobile {
 
   set: (p: Partial<UlatMobile>) => void;
   upCls: (clsId: string, fn: (c: Klass) => Partial<Klass>) => void;
-  toast: (msg: string) => void;
+  toast: (msg: string, act?: { label: string; run: () => void }) => void;
 }
 
 let toastTimer: ReturnType<typeof setTimeout> | null = null;
@@ -59,6 +60,7 @@ export const useUlat = create<UlatMobile>((set, get) => ({
   phoneAsmId: null,
   phoneSession: null,
   phoneToast: null,
+  phoneToastAct: null,
   na: { name: "", comp: "", period: "Semi-finals", max: "", later: false, date: todayIso(), notes: "" },
 
   studentId: "s7", // Reyes, Ana
@@ -75,10 +77,14 @@ export const useUlat = create<UlatMobile>((set, get) => ({
     set((s) => ({
       classes: s.classes.map((c) => (c.id === clsId ? { ...c, ...fn(c) } : c)),
     })),
-  toast: (msg) => {
+  toast: (msg, act) => {
     if (toastTimer) clearTimeout(toastTimer);
-    set({ phoneToast: msg });
-    toastTimer = setTimeout(() => set({ phoneToast: null }), 3500);
+    set({ phoneToast: msg, phoneToastAct: act || null });
+    // A toast with an action (e.g. Undo) stays a little longer.
+    toastTimer = setTimeout(
+      () => set({ phoneToast: null, phoneToastAct: null }),
+      act ? 5000 : 3500,
+    );
   },
 }));
 

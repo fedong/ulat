@@ -1,7 +1,9 @@
 import React, { useEffect, useMemo, useRef } from "react";
 import { router } from "expo-router";
 import {
+  Alert,
   Animated,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -251,16 +253,49 @@ export default function InstructorScreen() {
         a.date.localeCompare(b.date) ||
         gs.groups.findIndex((g) => g.id === a.group) - gs.groups.findIndex((g) => g.id === b.group),
     );
+  /** Remove today's session (accidental start): also clears the MISSED/EXC
+      scores it auto-carried into same-day assessments, unless hand-edited. */
+  const discardToday = (gid: string | null) => {
+    st.upCls(cls.id, (c) => {
+      const ses2 = c.sessions.find((x) => x.date === todayIso() && (x.group || null) === gid);
+      if (!ses2) return {};
+      const scores = { ...c.scores };
+      c.assessments
+        .filter((a) => linked(c, ses2, a))
+        .forEach((a) => {
+          c.roster.forEach((r) => {
+            const m = ses2.marks[r.id];
+            const auto = m === "A" ? "MISSED" : m === "E" ? "EXC" : null;
+            if (auto && (scores[r.id] || {})[a.id] === auto) {
+              const { [a.id]: _drop, ...rest } = scores[r.id];
+              scores[r.id] = rest;
+            }
+          });
+        });
+      return { sessions: c.sessions.filter((x) => x !== ses2), scores };
+    });
+    st.set({ phoneSession: null });
+    st.toast("Today's session was discarded.");
+  };
+  const confirmDiscard = (gid: string | null) => {
+    const nm = gid ? gName(gid) : "";
+    const title = "Discard today's " + (nm ? nm + " " : "") + "session?";
+    const body = "All of today's marks are removed for everyone. This cannot be undone.";
+    if (Platform.OS === "web") {
+      // eslint-disable-next-line no-alert
+      if (window.confirm(title + "\n\n" + body)) discardToday(gid);
+    } else {
+      Alert.alert(title, body, [
+        { text: "Cancel", style: "cancel" },
+        { text: "Discard", style: "destructive", onPress: () => discardToday(gid) },
+      ]);
+    }
+  };
+
   const startToday = (gid: string | null) => {
     const nm = gid ? gName(gid) : "";
     const idx = cls.sessions.findIndex((s) => s.date === todayIso() && (s.group || null) === gid);
-    if (idx >= 0) {
-      // Session is open: the button reads "Save today's session" — confirm
-      // the recorded marks and jump to today's chip.
-      st.set({ phoneSession: idx });
-      st.toast("Attendance saved · students and guardians see it now.");
-      return;
-    }
+    if (idx >= 0) return st.set({ phoneSession: idx });
     st.upCls(cls.id, (c) => ({
       sessions: sortSes([
         ...c.sessions,
@@ -277,7 +312,8 @@ export default function InstructorScreen() {
       (nm ? nm + " session" : "Session") +
         " started — all " +
         roster.length +
-        " marked Present. Tap a name to change a mark.",
+        " marked Present. Marks record as you tap.",
+      { label: "Undo", run: () => discardToday(gid) },
     );
   };
 
@@ -391,6 +427,7 @@ export default function InstructorScreen() {
       title={title}
       sub={sub}
       toast={st.phoneToast}
+      toastAction={st.phoneToastAct}
       tabBar={<TabBar tabs={tabs} active={st.ptabI} onPick={(k) => st.set({ ptabI: k })} />}
     >
       {/* ============ CLASSES + NEW ASSESSMENT ============ */}
@@ -788,26 +825,32 @@ export default function InstructorScreen() {
       {/* ============ ATTENDANCE ============ */}
       {st.ptabI === "attend" && (
         <>
-          {/* One full-width button per group. Once a session is open the same
-              button becomes the save action for today's marks. */}
+          {/* One control per group: Start (one tap, everyone Present, marks
+              record live) — or, once recording, a status strip with Discard
+              as the escape hatch for an accidental start. */}
           <View style={{ gap: 8 }}>
             {(multiGroup ? gs.groups.map((g) => [g.id, g.name] as const) : [[null, ""] as const]).map(
               ([gid, nm]) => {
                 const open = cls.sessions.some(
                   (x) => x.date === todayIso() && (x.group || null) === gid,
                 );
-                return (
+                return open ? (
+                  <View key={String(gid)} style={s.recStrip}>
+                    <View style={s.recDot} />
+                    <Text
+                      numberOfLines={1}
+                      style={{ fontFamily: F.b600, fontSize: 13, color: C.tealText, flexShrink: 1, flexGrow: 1 }}
+                    >
+                      {(nm ? "Today's " + nm + " session" : "Today's session") + " is recording"}
+                    </Text>
+                    <Pressable onPress={() => confirmDiscard(gid)} hitSlop={8}>
+                      <Text style={{ fontFamily: F.b700, fontSize: 12, color: C.redText }}>Discard</Text>
+                    </Pressable>
+                  </View>
+                ) : (
                   <PrimaryButton
                     key={String(gid)}
-                    label={
-                      open
-                        ? nm
-                          ? "Save today's " + nm + " session"
-                          : "Save today's session"
-                        : nm
-                          ? "Start today's " + nm + " session"
-                          : "Start today's session"
-                    }
+                    label={nm ? "Start today's " + nm + " session" : "Start today's session"}
                     onPress={() => startToday(gid)}
                   />
                 );
@@ -1131,6 +1174,24 @@ const s = StyleSheet.create({
     borderColor: C.line,
     borderRadius: 16,
     padding: 20,
+  },
+  recStrip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 13,
+    borderRadius: 14,
+    backgroundColor: "#E7F6F5",
+    borderWidth: 1,
+    borderColor: "rgba(15,163,160,0.3)",
+  },
+  recDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 999,
+    backgroundColor: C.teal,
+    flexShrink: 0,
   },
   avatar: {
     width: 64,
