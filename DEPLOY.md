@@ -1,7 +1,7 @@
 # Deploying Ulat
 
 Production runs as one Docker Compose stack — the Next.js app (web + `/api/v1`)
-with PostgreSQL 16 beside it — on a single Hetzner VPS managed by Coolify, per
+with PostgreSQL 16 beside it — on a single VPS managed by Coolify, per
 `Ulat_Infrastructure_Decisions.md`. The `Dockerfile` builds a standalone image
 that applies migrations on boot and serves on `:3000`; `docker-compose.yml` is
 the unit Coolify deploys.
@@ -63,7 +63,7 @@ Then, whichever box:
 - **Coolify scheduled database backup** on the Postgres service: `pg_dump`
   every 6 hours, retention ≥ 14 days, destination an S3-compatible bucket —
   **Cloudflare R2** (free tier covers this comfortably).
-- **Hetzner snapshots** of the whole VPS: enable auto-backups (7 rolling) as
+- **Provider snapshots** of the whole VPS: enable the host's auto-backups as
   the disaster-recovery layer. Snapshots alone are not the grade backup —
   the 6-hour dumps are.
 - Restore drill (do this once before launch): fresh Postgres container →
