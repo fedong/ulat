@@ -52,7 +52,7 @@ export default function InvoicesPage({ params }: { params: Promise<{ clsId: stri
       className="-mr-2 flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto pr-2"
       style={{ animation: "ulatIn .35s ease both" }}
     >
-      <div className="flex max-w-[760px] items-center justify-between gap-4">
+      <div className="mx-auto w-full flex max-w-[760px] items-center justify-between gap-4">
         <div className="text-[13px] text-sub">{t.refundPolicy}</div>
         <button
           onClick={() => {
@@ -64,7 +64,7 @@ export default function InvoicesPage({ params }: { params: Promise<{ clsId: stri
           {t.billing} →
         </button>
       </div>
-      <div className="max-w-[760px]">
+      <div className="mx-auto w-full max-w-[760px]">
         <div className="overflow-hidden rounded-2xl bg-card shadow-card">
           {invoices.length === 0 && (
             <div className="px-[18px] py-[26px] text-center text-[13px] text-faint">

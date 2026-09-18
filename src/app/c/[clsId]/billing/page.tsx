@@ -166,7 +166,7 @@ export default function BillingPage({ params }: { params: Promise<{ clsId: strin
     });
     checkoutCard = (
       <div
-        className="flex max-w-[1000px] flex-col gap-[18px] rounded-2xl px-6 py-[22px]"
+        className="mx-auto w-full flex max-w-[1000px] flex-col gap-[18px] rounded-2xl px-6 py-[22px]"
         style={{
           background: "linear-gradient(180deg,#FFFFFF 0%,#FDFCFA 100%)",
           border: "1.5px solid #0FA3A0",
@@ -303,7 +303,7 @@ export default function BillingPage({ params }: { params: Promise<{ clsId: strin
     >
       {/* Plan strip (only when no banner) */}
       {!hasBanner && (
-        <div className="flex max-w-[1000px] items-center justify-between gap-4 rounded-[14px] bg-white px-4 py-3" style={{ border: "1px solid rgba(34,48,60,0.06)" }}>
+        <div className="mx-auto w-full flex max-w-[1000px] items-center justify-between gap-4 rounded-[14px] bg-white px-4 py-3" style={{ border: "1px solid rgba(34,48,60,0.06)" }}>
           <div className="flex min-w-0 items-center gap-3">
             <span className="h-2 w-2 flex-shrink-0 rounded-full" style={{ background: planDot }} />
             <span className="whitespace-nowrap text-sm font-bold">
@@ -352,7 +352,7 @@ export default function BillingPage({ params }: { params: Promise<{ clsId: strin
       )}
 
       {ent.method === "GCash" && ent.state === "Active" && (
-        <div className="max-w-[1000px] rounded-xl border border-[#F2DFA0] bg-[#FFF6DC] px-3 py-2.5 text-[13px] leading-[1.5] text-amber-text">
+        <div className="mx-auto w-full max-w-[1000px] rounded-xl border border-[#F2DFA0] bg-[#FFF6DC] px-3 py-2.5 text-[13px] leading-[1.5] text-amber-text">
           {t.gcashNotice} {t.remindersOn}{" "}
           {ent.until && [14, 7, 1, 0].map((n) => fmtDM(new Date(ent.until!.getTime() - n * 864e5))).join(" · ")}.
         </div>
@@ -361,7 +361,7 @@ export default function BillingPage({ params }: { params: Promise<{ clsId: strin
       {checkoutCard}
 
       {showPlans && (
-        <div className="flex max-w-[1000px] flex-col gap-4">
+        <div className="mx-auto w-full flex max-w-[1000px] flex-col gap-4">
           <div className="flex flex-col items-center gap-3.5 pb-0.5 pt-2 text-center">
             <div>
               <div className="font-display text-2xl font-extrabold tracking-[-0.5px]">{t.plansTitle}</div>
@@ -472,7 +472,7 @@ export default function BillingPage({ params }: { params: Promise<{ clsId: strin
 
       {/* Referral nudge */}
       <div
-        className="flex max-w-[1000px] items-center justify-between gap-4 rounded-2xl px-5 py-4 text-canvas"
+        className="mx-auto w-full flex max-w-[1000px] items-center justify-between gap-4 rounded-2xl px-5 py-4 text-canvas"
         style={{ background: "linear-gradient(135deg,#101D26 0%,#16242F 100%)", border: "1px solid rgba(255,255,255,0.06)" }}
       >
         <div className="min-w-0">

@@ -66,7 +66,7 @@ export default function ProfilePage() {
       className="-mr-2 flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto pr-2"
       style={{ animation: "ulatIn .35s ease both" }}
     >
-      <div className="flex max-w-[880px] items-center gap-[18px]">
+      <div className="mx-auto w-full flex max-w-[880px] items-center gap-[18px]">
         <div
           className="flex h-[72px] w-[72px] flex-shrink-0 items-center justify-center rounded-[22px] font-display text-[26px] font-extrabold text-white"
           style={{
@@ -87,7 +87,7 @@ export default function ProfilePage() {
         </div>
       </div>
 
-      <div className="grid max-w-[880px] grid-cols-[minmax(0,1fr)_minmax(0,1fr)] items-start gap-5">
+      <div className="mx-auto w-full grid max-w-[880px] grid-cols-[minmax(0,1fr)_minmax(0,1fr)] items-start gap-5">
         {/* Left column */}
         <div className="flex min-w-0 flex-col gap-2.5">
           {sectionHead(

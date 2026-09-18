@@ -152,7 +152,7 @@ export default function SettingsPage({ params }: { params: Promise<{ clsId: stri
       className="-mr-2 flex min-h-0 flex-1 flex-col gap-7 overflow-y-auto pr-2"
     >
       {/* 1 · Grading components */}
-      <div className="flex max-w-[960px] flex-col gap-3">
+      <div className="mx-auto w-full flex max-w-[960px] flex-col gap-3">
         <div className="flex items-center justify-between gap-4 px-0.5">
           <div>
             <div className="font-display text-[17px] font-extrabold">Grading components</div>
@@ -337,7 +337,7 @@ export default function SettingsPage({ params }: { params: Promise<{ clsId: stri
       </div>
 
       {/* 2+3+4+5 · Scale / periods / term / consultation */}
-      <div className="grid max-w-[960px] grid-cols-2 items-start gap-5">
+      <div className="mx-auto w-full grid max-w-[960px] grid-cols-2 items-start gap-5">
         <div className="flex flex-col gap-3">
           {sectionHead("Scale and passing", "What students and guardians see.")}
           <div className={cardCls}>
@@ -670,7 +670,7 @@ export default function SettingsPage({ params }: { params: Promise<{ clsId: stri
       </div>
 
       {/* 6 · Transmutation table */}
-      <div className="flex max-w-[960px] flex-col gap-3">
+      <div className="mx-auto w-full flex max-w-[960px] flex-col gap-3">
         <div className="flex items-center justify-between px-0.5">
           <div>
             <div className="font-display text-[17px] font-extrabold">Transmutation table</div>
@@ -732,7 +732,7 @@ export default function SettingsPage({ params }: { params: Promise<{ clsId: stri
       </div>
 
       {/* 7 · Instructors */}
-      <div className="flex max-w-[960px] flex-col gap-3">
+      <div className="mx-auto w-full flex max-w-[960px] flex-col gap-3">
         {sectionHead(
           "Instructors",
           "Team teaching is optional. If the other instructor is not on Ulat, keep recording their part here yourself.",
@@ -885,7 +885,7 @@ export default function SettingsPage({ params }: { params: Promise<{ clsId: stri
       </div>
 
       {/* 8 · This class */}
-      <div className="flex max-w-[960px] flex-col gap-3 pb-2">
+      <div className="mx-auto w-full flex max-w-[960px] flex-col gap-3 pb-2">
         {sectionHead("This class", cls.code + " · " + cls.section + " · " + cls.term)}
         <div className={cardCls}>
           <div className="flex items-center justify-between gap-4">

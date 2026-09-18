@@ -53,7 +53,7 @@ export default function ReferralsPage() {
       className="-mr-2 flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto pr-2"
       style={{ animation: "ulatIn .35s ease both" }}
     >
-      <div className="grid max-w-[760px] grid-cols-3 gap-3">
+      <div className="mx-auto w-full grid max-w-[760px] grid-cols-3 gap-3">
         {steps.map(([title, body], i) => (
           <div key={i} className="flex flex-col gap-2 rounded-2xl bg-card px-[18px] py-4 shadow-card">
             <span className="inline-flex h-[26px] w-[26px] items-center justify-center rounded-full bg-teal-tint-12 font-display text-[13px] font-extrabold text-teal-text">
@@ -65,7 +65,7 @@ export default function ReferralsPage() {
         ))}
       </div>
 
-      <div className="max-w-[760px]">
+      <div className="mx-auto w-full max-w-[760px]">
         <div className="flex flex-col gap-3.5 rounded-2xl bg-card px-5 py-[18px] shadow-card">
           <div className="flex items-center justify-between gap-3 rounded-xl border border-line bg-canvas px-3.5 py-3">
             <div className="min-w-0">
@@ -103,7 +103,7 @@ export default function ReferralsPage() {
         </div>
       </div>
 
-      <div className="max-w-[760px] text-xs leading-[1.5] text-faint">{t.referFine}</div>
+      <div className="mx-auto w-full max-w-[760px] text-xs leading-[1.5] text-faint">{t.referFine}</div>
     </div>
   );
 }

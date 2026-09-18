@@ -35,7 +35,7 @@ Open http://localhost:3000 — sign in with any email + password (demo auth), or
 | `src/lib/store.ts` | Zustand store: classes, shared period state, save indicator, dialogs |
 | `src/app/signin` | Sign in / sign up split screen |
 | `src/app/c/[clsId]/…` | App shell (sidebar + header) and the seven class pages: overview, gradebook, assessments, attendance, students, sharing, settings |
-| `src/app/new` | Class wizard route (next milestone) |
+| `src/app/new` | 4-step class wizard (details, grading, roster import, review) |
 
 ## Status
 
@@ -60,5 +60,9 @@ read-only classes with dropped writes). Entitlement is a demo stand-in for
 `localStorage.setItem("ulat_ent", "Free" /* Trialing | Active | Past due | Grace */)`
 and reload.
 
-Next milestones: the 4-step class wizard (roster import/parsing) and the
-instructor/student/guardian mobile views.
+The 4-step class wizard is live at `/new`: class details (level presets drive
+terms and periods, schedule slots with validation, join code), grading-system
+editors, roster import (CSV/TXT/XLSX/PDF file parsing plus paste, with issue
+flags, inline fixes and sorting), and review/create.
+
+Next milestone: the instructor/student/guardian mobile views.
