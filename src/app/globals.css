@@ -117,6 +117,12 @@ textarea {
     border-color 0.18s ease,
     box-shadow 0.18s ease;
 }
+/* Let inputs shrink inside grid/flex tracks (browsers give them an
+   intrinsic ~180px minimum that otherwise forces horizontal overflow). */
+input,
+select {
+  min-width: 0;
+}
 input:focus,
 textarea:focus,
 select:focus {

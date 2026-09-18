@@ -533,7 +533,7 @@ export default function NewClassPage() {
                   Start from a preset, then change anything. All of this stays editable in Settings.
                 </div>
               </div>
-              <div className="grid grid-cols-4 gap-3">
+              <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
                 {PRESETS.map((p, i) => (
                   <button
                     key={p.name}
@@ -546,7 +546,7 @@ export default function NewClassPage() {
                   </button>
                 ))}
               </div>
-              <div className="grid grid-cols-[minmax(0,1fr)_400px] items-start gap-5">
+              <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(0,1fr)_400px]">
                 <div className="flex min-w-0 flex-col gap-3">
                   {gs.groups.map((g) => {
                     const sum = g.comps.reduce((a, c) => a + (Number(c.w) || 0), 0);
@@ -817,7 +817,7 @@ export default function NewClassPage() {
                   Import a class list now, or skip and let students join with the code. Both can be combined later.
                 </div>
               </div>
-              <div className="grid grid-cols-2 items-stretch gap-5">
+              <div className="grid grid-cols-1 items-stretch gap-5 lg:grid-cols-2">
                 <div className="flex flex-col gap-3">
                   <label
                     className="flex h-[140px] cursor-pointer flex-col items-center justify-center gap-1.5 rounded-2xl border-2 border-dashed bg-white px-6 py-4 text-center hover:!border-teal"
