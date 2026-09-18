@@ -83,14 +83,16 @@ function ClassCard({
             backgroundColor: on ? "#E7F6F5" : "#FFFFFF",
             opacity: scrollX.interpolate({
               inputRange,
-              outputRange: [0.55, 1, 0.55],
+              outputRange: [0.65, 1, 0.65],
               extrapolate: "clamp",
             }),
             transform: [
               {
+                // All cards share the same base width; the centered one grows
+                // proportionally instead of the neighbors shrinking.
                 scale: scrollX.interpolate({
                   inputRange,
-                  outputRange: [0.9, 1, 0.9],
+                  outputRange: [1, 1.06, 1],
                   extrapolate: "clamp",
                 }),
               },
@@ -123,6 +125,7 @@ export default function InstructorScreen() {
   const fil = st.lang === "Filipino";
   const carouselRef = useRef<ScrollView>(null);
   const carouselX = useRef(new Animated.Value(0)).current;
+  const sesChipsRef = useRef<ScrollView>(null);
 
   const asmsP = useMemo(
     () => cls.assessments.filter((a) => a.period === st.period),
@@ -202,6 +205,13 @@ export default function InstructorScreen() {
   const si = Math.min(st.phoneSession ?? nSes - 1, nSes - 1);
   const ses = nSes > 0 ? cls.sessions[si] : null;
 
+  // Keep the selected date chip in view (chips list newest-first; 60px + 8 gap).
+  useEffect(() => {
+    if (nSes === 0 || si < 0) return;
+    const pos = (nSes - 1 - si) * 68;
+    sesChipsRef.current?.scrollTo({ x: Math.max(0, pos - 130), animated: true });
+  }, [si, nSes]);
+
   const tapMark = (sid: string) => {
     if (!ses) return;
     st.upCls(cls.id, (c) => {
@@ -242,8 +252,17 @@ export default function InstructorScreen() {
         gs.groups.findIndex((g) => g.id === a.group) - gs.groups.findIndex((g) => g.id === b.group),
     );
   const startToday = (gid: string | null) => {
+    const nm = gid ? gName(gid) : "";
     const idx = cls.sessions.findIndex((s) => s.date === todayIso() && (s.group || null) === gid);
-    if (idx >= 0) return st.set({ phoneSession: idx });
+    if (idx >= 0) {
+      // Already open: jump to it and say so, so the tap never feels dead.
+      st.set({ phoneSession: idx });
+      st.toast(
+        (nm ? "Today's " + nm + " session" : "Today's session") +
+          " is already open — you're viewing it below.",
+      );
+      return;
+    }
     st.upCls(cls.id, (c) => ({
       sessions: sortSes([
         ...c.sessions,
@@ -256,6 +275,12 @@ export default function InstructorScreen() {
     }));
     const next = sortSes([...cls.sessions, { date: todayIso(), group: gid || undefined, marks: {} }]);
     st.set({ phoneSession: next.findIndex((s) => s.date === todayIso() && (s.group || null) === gid) });
+    st.toast(
+      (nm ? nm + " session" : "Session") +
+        " started — all " +
+        roster.length +
+        " marked Present. Tap a name to change a mark.",
+    );
   };
 
   /* ---- alerts (needs attention) — always on the class's live period, not
@@ -511,7 +536,7 @@ export default function InstructorScreen() {
                       >
                         <Text
                           numberOfLines={1}
-                          style={{ fontFamily: F.b700, fontSize: 12, color: on ? C.ink : C.sub }}
+                          style={{ fontFamily: F.b700, fontSize: 12, color: on ? "#FFFFFF" : C.sub }}
                         >
                           {label}
                         </Text>
@@ -809,7 +834,12 @@ export default function InstructorScreen() {
           )}
           {nSes > 0 && ses && (
             <>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingVertical: 2 }}>
+              <ScrollView
+                ref={sesChipsRef}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={{ gap: 8, paddingVertical: 2 }}
+              >
                 {cls.sessions
                   .map((x, k) => ({ x, k }))
                   .reverse()
@@ -1016,7 +1046,7 @@ export default function InstructorScreen() {
                 const on = st.lang === l;
                 return (
                   <Pressable key={l} onPress={() => st.set({ lang: l })} style={[s.segBtn, on && s.segBtnOn]}>
-                    <Text style={{ fontFamily: F.b700, fontSize: 12, color: on ? C.ink : C.sub }}>{l}</Text>
+                    <Text style={{ fontFamily: F.b700, fontSize: 12, color: on ? "#FFFFFF" : C.sub }}>{l}</Text>
                   </Pressable>
                 );
               })}
@@ -1092,7 +1122,7 @@ const s = StyleSheet.create({
     borderColor: C.line,
   },
   segBtn: { flex: 1, borderRadius: 9, alignItems: "center", justifyContent: "center" },
-  segBtnOn: { backgroundColor: "#FFFFFF", borderWidth: 1, borderColor: C.line },
+  segBtnOn: { backgroundColor: C.teal },
   scoreInput: {
     width: 72,
     height: 40,
