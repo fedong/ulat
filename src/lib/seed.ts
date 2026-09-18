@@ -170,17 +170,19 @@ function buildMTEC(): Klass {
     schedule: "Tue/Thu 1:30–3:00 · B-301 · Lab 3:00–6:00 · MTLAB4F",
     joinCode: "MT3A7K",
     grading: PRESETS[1].make(),
+    // Fictional demo roster (same invented families as the CS101 sample plus
+    // more made-up names) — no real student data.
     roster: [
-      "Alim, Hedaya S.", "Ambolo, Hanifa G.", "Apat, Hannah Faith P.", "Apostol, Chester Rafael A.",
-      "Aquinde, Abigail B.", "Bacus, Deib Michael A.", "Baroman, Katrina Nicole L.", "Baunto, Shahanie R.",
-      "Bernabe, Fermin Fourth B.", "Caballero, Trix Mikyla L.", "Cagatan, Dane Geld R.",
-      "Decampong, Mohammad Alfaiz S.", "Familar, Stephany I.", "Hernandez, Chase Dhea A.",
-      "Juntilla, Pearl Lyza P.", "Langitao, Ainie D.", "Lim, Sophia Claire Y.", "Lomangco, Aisha Sofia M.",
-      "Mabao, Elizah Dionne E.", "Mabayo, Trisha Nicole A.", "Macadaag, Izzahanie S.",
-      "Malawad, Sittie Shahidah B.", "Ombar, Asnaira H.", "Padua, Yaeshona Foy B.", "Panuncial, Mariacel D.",
-      "Penales, Clarence Harvey M.", "Pundaodaya, Rahimah M.", "Ramirez, Kyla A.", "Rudi, Wisham M.",
-      "Sarmiento, Mary Joseth M.", "Suanga, Abdul Rahman P.", "Tindug, Ranaa Rashidah M.",
-      "Torres, Bea Kirstin L.", "Urquia, Gabie Jirah S.",
+      "Abad, Kristine Joy M.", "Alonzo, Patricia Mae D.", "Aquino, Paolo R.", "Bautista, Maria C.",
+      "Cabrera, Angelo James T.", "Castillo, Bianca Marie L.", "Corpuz, Daniella F.", "Dela Cruz, Juan P.",
+      "Del Rosario, Samantha Nicole V.", "Dimaculangan, Rafael B.", "Domingo, Charles Andrei S.",
+      "Escobar, Francine Faye G.", "Fernandez, Luis Gabriel O.", "Flores, Jasmine Kate A.",
+      "Garcia, Jose M.", "Gonzales, Erika Denise R.", "Ignacio, Martin Josef E.", "Lazaro, Camille Anne D.",
+      "Legaspi, Adrian Paul N.", "Lucero, Danica Ysabel J.", "Magbanua, Timothy John C.",
+      "Manalo, Alyssa Jane Q.", "Mendoza, Carlo V.", "Navarro, Kevin Ross I.", "Ocampo, Lorraine Beth U.",
+      "Pascual, Migo Enrique H.", "Quimpo, Alexa Jean W.", "Ramos, Nico D.", "Reyes, Ana T.",
+      "Salazar, Vince Harold K.", "Santos, Miguel B.", "Torres, Bea A.",
+      "Villanueva, Liza G.", "Yap, Cedric John Z.",
     ].map((name, i) => {
       const [last, rest] = name.split(", ");
       const w = rest.split(" ");
