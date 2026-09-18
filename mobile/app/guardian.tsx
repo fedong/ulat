@@ -353,7 +353,10 @@ export default function GuardianScreen() {
             <Text style={{ fontFamily: F.b400, fontSize: 13, color: C.sub }}>
               Guardian of {kids.map((k) => k.first).join(" and ")}
             </Text>
-            <Chip text={DEMO_GUARDIAN.role} bg="rgba(212,90,140,0.14)" color="#8C2F5A" />
+            {/* Chip self-aligns flex-start for inline use; center it here. */}
+            <View style={{ alignSelf: "center" }}>
+              <Chip text={DEMO_GUARDIAN.role} bg="rgba(212,90,140,0.14)" color="#8C2F5A" />
+            </View>
           </Card>
           <Card style={{ gap: 10 }}>
             <SectionTitle>What {kids[0].first} shares</SectionTitle>

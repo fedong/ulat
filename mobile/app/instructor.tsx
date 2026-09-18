@@ -78,7 +78,9 @@ function ClassCard({
             borderWidth: 1.5,
             gap: 1,
             borderColor: on ? C.teal : C.line,
-            backgroundColor: on ? C.tealTint10 : "#FFFFFF",
+            // Opaque tint (tealTint10 over white): Android elevation shadows
+            // bleed through translucent backgrounds and draw an inner ring.
+            backgroundColor: on ? "#E7F6F5" : "#FFFFFF",
             opacity: scrollX.interpolate({
               inputRange,
               outputRange: [0.55, 1, 0.55],

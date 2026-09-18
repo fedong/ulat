@@ -3,13 +3,11 @@ import {
   Animated,
   Easing,
   LayoutAnimation,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
-  UIManager,
   View,
   type PressableProps,
   type StyleProp,
@@ -23,11 +21,6 @@ import Svg, { Circle, Path, Rect } from "react-native-svg";
 import { ContentBg } from "./brand";
 import { C, F, cardShadow } from "./theme";
 import type { UpcomingItem } from "./demo";
-
-// Android (old architecture) needs LayoutAnimation switched on once.
-if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
 
 /* ---------- press feedback (web: button:active scale) ---------- */
 
