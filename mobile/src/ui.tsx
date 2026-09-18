@@ -421,6 +421,12 @@ export function PhoneShell({
         style={{ flex: 1 }}
         contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 10, paddingBottom: 20 }}
         showsVerticalScrollIndicator={false}
+        // iOS slides the keyboard OVER content (Android resizes the window);
+        // this makes the list scroll clear of it so bottom inputs stay visible.
+        automaticallyAdjustKeyboardInsets
+        // One tap moves focus between score inputs while the keyboard is up,
+        // instead of the first tap only dismissing the keyboard.
+        keyboardShouldPersistTaps="handled"
       >
         <FadeInView style={{ gap: 14 }}>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
