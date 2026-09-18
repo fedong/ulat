@@ -1,0 +1,46 @@
+# Ulat production stack (Coolify deploys this compose file): the Next.js
+# app (web + /api/v1) with PostgreSQL beside it, per the infrastructure
+# decisions (single Hetzner box, Coolify-managed).
+#
+# Required environment (set in Coolify's env editor, or .env next to this
+# file): POSTGRES_PASSWORD, JWT_SECRET, NEXT_PUBLIC_APP_URL.
+# Optional: PAYMONGO_SECRET_KEY, PAYMONGO_WEBHOOK_SECRET, SEED_DEMO=1.
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ulat
+      POSTGRES_USER: ulat
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+    volumes:
+      - ulat-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ulat -d ulat"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build:
+      context: .
+      args:
+        # Baked into the client bundle (QR codes, invite links).
+        NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://ulat:${POSTGRES_PASSWORD}@db:5432/ulat
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET}
+      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
+      PAYMONGO_SECRET_KEY: ${PAYMONGO_SECRET_KEY:-}
+      PAYMONGO_WEBHOOK_SECRET: ${PAYMONGO_WEBHOOK_SECRET:-}
+      SEED_DEMO: ${SEED_DEMO:-0}
+    ports:
+      - "${APP_PORT:-3000}:3000"
+
+volumes:
+  ulat-pgdata:

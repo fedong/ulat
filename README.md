@@ -223,4 +223,16 @@ applied, cancel/resume renewals server-side), Invoices lists real `ULAT-`
 numbered invoices, and Referrals shows your real code, link
 (`/signin?ref=CODE` attributes the sign-up) and credit balance.
 
-Next milestone: Dockerfile + Coolify deploy (and notifications after).
+Phase 6: the stack ships as one Docker Compose unit (see `DEPLOY.md` for the
+full Coolify runbook — server, domain, backups, PayMongo go-live). The
+multi-stage `Dockerfile` builds the standalone Next server with the Prisma
+client, a bundled plain-JS demo seed, and a self-contained Prisma CLI; on
+boot the container applies `migrate deploy` (retrying while Postgres comes
+up), optionally seeds (`SEED_DEMO=1`), then serves with a database-checking
+`/api/health` endpoint wired as the container healthcheck. `docker-compose.yml`
+runs the app beside PostgreSQL 16 — verified here end to end: the production
+image passes the full API suite (123 checks) and the browser E2E (15 checks)
+running against the container. GitHub Actions CI typechecks both apps,
+builds, and runs the API suite against a Postgres service on every push.
+
+Next up: notifications (SES email, Expo push) and the weekly guardian digest.

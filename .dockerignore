@@ -1,0 +1,15 @@
+node_modules
+mobile
+design_handoff_ulat
+.next
+dist
+.git
+.env
+*.log
+scripts
+.github
+Ulat_Infrastructure_Decisions.md
+DEPLOY.md
+README.md
+Dockerfile.sandbox
+compose.sandbox.yml
