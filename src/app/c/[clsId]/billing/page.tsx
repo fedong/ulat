@@ -13,10 +13,10 @@ import {
   type PayMethod,
   type PlanCycle,
 } from "@/lib/billing";
-import { useEntitlement } from "@/lib/hooks";
+import { setRenewal, startProCheckout, type CheckoutStart } from "@/lib/api";
+import { useBillingData, useEntitlement } from "@/lib/hooks";
+import { refreshBilling } from "@/lib/session";
 import { useUlat, type CheckoutState } from "@/lib/store";
-
-const CREDIT = 19900;
 
 export default function BillingPage({ params }: { params: Promise<{ clsId: string }> }) {
   const { clsId } = use(params);
@@ -24,6 +24,8 @@ export default function BillingPage({ params }: { params: Promise<{ clsId: strin
   const st = useUlat();
   const { ent, activeN, L, fil } = useEntitlement();
   const t = billingStrings(fil);
+  const billing = useBillingData();
+  const renewCancelled = ent.state === "Active" && !ent.autoRenew && ent.method !== "GCash";
 
   const untilTxt = ent.until ? fmtLong(ent.until) : "";
   const dl = ent.until ? daysLeft(ent.until) : 0;
@@ -44,7 +46,7 @@ export default function BillingPage({ params }: { params: Promise<{ clsId: strin
   const billLead =
     ent.state === "Trialing" ? L("Full Pro access, free until " + untilTxt + ".", "Buong Pro access, libre hanggang " + untilTxt + ".")
     : ent.state === "Active"
-      ? st.subCancel
+      ? renewCancelled
         ? L("Renewal cancelled. Pro stays on until " + untilTxt + ".", "Kanselado ang renewal. Tuloy ang Pro hanggang " + untilTxt + ".")
         : ent.autoRenew
           ? L("Renews automatically on " + untilTxt + ".", "Awtomatikong mare-renew sa " + untilTxt + ".")
@@ -84,7 +86,11 @@ export default function BillingPage({ params }: { params: Promise<{ clsId: strin
       ),
       confirmLabel: L("Cancel plan", "Kanselahin"),
       danger: true,
-      onConfirm: () => st.set({ subCancel: true }),
+      onConfirm: () => {
+        void setRenewal(false)
+          .then(() => refreshBilling())
+          .catch(() => {});
+      },
     });
 
   const showPlans = ent.state !== "Active" || st.showPlans;
@@ -109,46 +115,62 @@ export default function BillingPage({ params }: { params: Promise<{ clsId: strin
       },
     });
 
-  /* ---- checkout ---- */
+  /* ---- checkout (live: /v1/billing) ---- */
   const co = st.checkout;
-  const creditAvail = st.creditUsed ? 0 : CREDIT;
+  const creditAvail = billing?.creditCents ?? 0;
   let checkoutCard: React.ReactNode = null;
   if (co) {
     const gross = co.plan === "Annual" ? 119900 : 19900;
     const credit = Math.min(creditAvail, gross);
     const net = gross - credit;
     const coPlanLabel = co.plan === "Annual" ? L("Pro · Yearly", "Pro · Taunan") : L("Pro · Monthly", "Pro · Buwanan");
+    // Settle a started checkout: live keys → PayMongo redirect; the sandbox
+    // provider settles in place through the same pending-payment path.
+    const settle = async (start: CheckoutStart) => {
+      if (start.provider === "paymongo" && start.url) {
+        window.location.href = start.url;
+        return;
+      }
+      if (start.provider === "mock") {
+        const { settleMockPayment } = await import("@/lib/api");
+        await settleMockPayment(start.ref);
+      }
+      const fresh = await refreshBilling();
+      const s = useUlat.getState();
+      if (!s.checkout) return;
+      s.set({
+        checkout: {
+          ...s.checkout,
+          step: "done",
+          until: fresh.entitlement.until ? fresh.entitlement.until + "T00:00:00" : undefined,
+        } as CheckoutState,
+        selDone: false,
+        editableIds: null,
+        pickIds: null,
+      });
+    };
     const coGo = () => {
       st.set({ checkout: { ...co, step: "redirect" } });
-      setTimeout(
-        () => {
-          const s = useUlat.getState();
-          const cur = s.checkout;
-          if (!cur) return;
-          const until = new Date();
-          if (co.plan === "Annual") until.setFullYear(until.getFullYear() + 1);
-          else until.setMonth(until.getMonth() + 1);
-          const inv = {
-            no: "ULAT-000" + (240 + s.invoices.length),
-            date: fmtLong(new Date()),
-            desc: "Pro · " + (co.plan === "Annual" ? L("Yearly", "Taunan") : L("Monthly", "Buwanan")) + " · " + co.method,
-            net: peso(net),
-            status: net === 0 ? L("Paid by credit", "Bayad sa credit") : L("Paid", "Bayad"),
-            color: "#0B807E",
-          };
-          s.set({
-            checkout: { ...cur, step: "done", until: until.toISOString() } as CheckoutState,
-            sub: { plan: co.plan, method: co.method, until: until.toISOString() },
-            subCancel: false,
-            creditUsed: s.creditUsed || credit > 0,
-            invoices: [inv, ...s.invoices],
-            selDone: false,
-            editableIds: null,
-            pickIds: null,
+      void (async () => {
+        try {
+          const start = await startProCheckout(co.plan, co.method);
+          // Keep the hand-off beat visible before settling the sandbox.
+          await new Promise((r) => setTimeout(r, start.netCents === 0 ? 400 : 1200));
+          if (!useUlat.getState().checkout) return; // cancelled meanwhile
+          await settle(start);
+        } catch {
+          st.set({ checkout: { ...co, step: "method" } });
+          st.confirm({
+            title: L("Payment didn't start", "Hindi nagsimula ang bayad"),
+            body: L(
+              "The payment provider could not be reached. Check your connection and try again.",
+              "Hindi maabot ang payment provider. Suriin ang koneksyon at subukan muli.",
+            ),
+            confirmLabel: "OK",
+            onConfirm: () => {},
           });
-        },
-        net === 0 ? 400 : 1400,
-      );
+        }
+      })();
     };
     const methods = (["Card", "Maya", "GCash"] as PayMethod[]).map((m) => {
       const dis = m === "GCash" && co.plan === "Monthly";
@@ -328,9 +350,13 @@ export default function BillingPage({ params }: { params: Promise<{ clsId: strin
                 {t.cancelAtEnd}
               </button>
             )}
-            {ent.state === "Active" && st.subCancel && ent.method !== "GCash" && (
+            {ent.state === "Active" && renewCancelled && (
               <button
-                onClick={() => st.set({ subCancel: false })}
+                onClick={() =>
+                  void setRenewal(true)
+                    .then(() => refreshBilling())
+                    .catch(() => {})
+                }
                 className="h-8 cursor-pointer whitespace-nowrap rounded-[9px] border-[1.5px] border-teal bg-white px-3 text-xs font-bold text-teal-text"
               >
                 {t.resume}

@@ -125,6 +125,18 @@ try {
   await p2.reload();
   await p2.getByText("QA200 · Quality Assurance").first().waitFor({ timeout: 15000 });
   ok(true, "created class survives a reload — persisted via the API");
+
+  console.log("checkout through the billing UI (sandbox provider)");
+  const clsUrl = p2.url().replace(/\/overview.*$/, "");
+  await p2.goto(`${clsUrl}/billing`);
+  await p2.getByText("Continue on Pro", { exact: true }).click();
+  await p2.getByText(/Continue to PayMongo/).click();
+  await p2.getByText("Payment received").waitFor({ timeout: 25000 });
+  ok(true, "sandbox checkout settles and Pro activates");
+  await p2.goto(`${clsUrl}/invoices`);
+  await p2.getByText(/ULAT-\d{4}-\d{4}/).first().waitFor({ timeout: 15000 });
+  await p2.getByText("Paid", { exact: true }).first().waitFor();
+  ok(true, "the paid invoice is on file");
   await ctx2.close();
 
   console.log(`\nAll ${passed} checks passed.`);

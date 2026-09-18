@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AnimatedLogo, HeroCarousel } from "@/components/AnimatedLogo";
 import { useRouter } from "next/navigation";
 import { ApiError } from "@/lib/api";
@@ -20,6 +20,18 @@ export default function SignInPage() {
   const { signup, authError, auth, set } = useUlat();
   const [errMsg, setErrMsg] = useState("");
   const [busy, setBusy] = useState(false);
+  // Referral link (…/signin?ref=CODE): attribute the sign-up to the referrer.
+  const [refCode, setRefCode] = useState("");
+  useEffect(() => {
+    try {
+      const r = new URLSearchParams(window.location.search).get("ref");
+      if (r) {
+        setRefCode(r.toUpperCase());
+        set({ signup: true });
+      }
+    } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   usePageTitle("Sign in · Ulat");
 
   const setA = (k: keyof typeof auth) => (e: React.ChangeEvent<HTMLInputElement>) =>
@@ -63,6 +75,7 @@ export default function SignInPage() {
             email: auth.email,
             password: auth.pw,
             school: auth.school,
+            ref: refCode || undefined,
             ...nameParts(auth.name),
           })
         : doSignIn(auth.email, auth.pw),

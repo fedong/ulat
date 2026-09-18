@@ -1,6 +1,6 @@
 "use client";
 
-import { loadAll, register, resume, saveProfile, signIn, signOut } from "./api";
+import { getBilling, loadAll, register, resume, saveProfile, signIn, signOut, toEntitlement } from "./api";
 import { BLANK_PROFILE, useUlat, type Profile } from "./store";
 
 /** Session lifecycle: boot-on-load, sign-in/up, sign-out — all store-aware. */
@@ -54,6 +54,7 @@ export async function doRegister(b: {
   first?: string;
   last?: string;
   school?: string;
+  ref?: string;
 }) {
   const { school, ...rest } = b;
   await register(rest);
@@ -66,12 +67,29 @@ export async function doRegister(b: {
   return classes;
 }
 
+/** Re-pull billing + entitlement (after checkout / cancel / on billing pages). */
+export async function refreshBilling() {
+  const billing = await getBilling();
+  const ent = toEntitlement(billing.entitlement);
+  useUlat.setState({
+    billing,
+    entApi: ent,
+    entState: ent.state,
+    payMethodPref: (ent.method as never) ?? useUlat.getState().payMethodPref,
+    // Server entitlement is the source of truth again.
+    sub: null,
+    subCancel: false,
+  });
+  return billing;
+}
+
 export async function doSignOut() {
   await signOut();
   useUlat.setState({
     signedIn: false,
     classes: [],
     email: "",
+    billing: null,
     entApi: null,
     student: null,
     asmId: null,

@@ -90,6 +90,7 @@ Endpoints (all JSON, `Authorization: Bearer <access>` after auth):
 | `GET /api/v1/join/[code]` · `GET /api/v1/invites/[code]` | Public lookups behind the QR/landing pages (`/join/[code]`, `/g/[code]`) — class info, or the invited student's first name + role |
 | `POST /api/v1/student/invite` · `GET /api/v1/student/guardians` | Student-driven guardian invite (account-level: follows every class, current and future) and their guardian list |
 | `POST /api/v1/classes/[id]/nudge` | "Ask student": a prompt in the student's app to invite a guardian |
+| `GET /api/v1/billing` · `POST …/checkout` · `…/cancel` · `…/webhook` · `…/mock-pay` | Plan & billing: entitlement, credit, referral code, invoices; PayMongo checkout (Card/Maya/GCash — GCash yearly-only, never auto-renew); cancel/resume at period end; webhook fulfillment (live keys) or the built-in sandbox settler (no keys) |
 | `GET /api/v1/student/classes` | The student's scoped view of each enrolled class (own row/scores/marks only, never the join code) — still the `Klass` shape, so the shared grade engine runs on it |
 | `POST /api/v1/guardian/claim` · `GET /api/v1/guardian/children` | Claim an invite code; children with scope-gated class views (Grades and Attendance always shared, "Missing work"/Remarks per class policy, remarks stripped server-side when off) |
 
@@ -205,4 +206,21 @@ can revoke them, and "Ask student" now raises a real prompt in the student's
 app. Refresh-token rotation gained a grace window so quick page hops can't
 burn a session.
 
-Next milestone: payments (PayMongo) & entitlements, then the Coolify deploy.
+Phase 5: payments and entitlements are real. Checkout goes through a
+provider abstraction — with `PAYMONGO_SECRET_KEY` set it creates PayMongo
+Checkout Sessions (Card/Maya/GCash) and settles on the signed webhook;
+without keys the built-in sandbox provider drives the exact same
+pending-payment → fulfillment path, so dev and CI exercise the real code.
+Fulfillment is idempotent: it marks the invoice paid, stacks the new cycle
+on any remaining Pro time, consumes referral credit, and awards the
+referrer ₱199 on the referred account's first yearly payment. Entitlement
+states are now computed against the clock server-side — expired trials read
+Free, an expired subscription reads Past due (auto-renew) or Grace (manual)
+for 7 days and then demotes to Free, persisted lazily on `/auth/me` — and
+the free 2-class limit follows the effective tier. The web Plan & billing
+page runs its polished checkout flow against the live API (credit shown and
+applied, cancel/resume renewals server-side), Invoices lists real `ULAT-`
+numbered invoices, and Referrals shows your real code, link
+(`/signin?ref=CODE` attributes the sign-up) and credit balance.
+
+Next milestone: Dockerfile + Coolify deploy (and notifications after).

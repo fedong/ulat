@@ -2,50 +2,33 @@
 
 import { useRouter } from "next/navigation";
 import { use } from "react";
-import { billingStrings, type Invoice } from "@/lib/billing";
-import { useEntitlement } from "@/lib/hooks";
+import { billingStrings, fmtLong, peso, type Invoice } from "@/lib/billing";
+import { useBillingData, useEntitlement } from "@/lib/hooks";
 import { useUlat } from "@/lib/store";
 
 export default function InvoicesPage({ params }: { params: Promise<{ clsId: string }> }) {
   const { clsId } = use(params);
   const router = useRouter();
   const st = useUlat();
-  const { ent, L, fil } = useEntitlement();
+  const { L, fil } = useEntitlement();
   const t = billingStrings(fil);
+  const billing = useBillingData();
 
-  const seedInv: Invoice[] =
-    ent.state === "Active" && !st.sub
-      ? [
-          {
-            no: "ULAT-000231",
-            date: "3 September 2026",
-            desc: "Pro · " + L("Yearly", "Taunan") + " · " + ent.method,
-            net: "₱1,199.00",
-            status: L("Paid", "Bayad"),
-            color: "#0B807E",
-          },
-        ]
-      : ent.state === "Past due"
-        ? [
-            {
-              no: "—",
-              date: "16 September 2026",
-              desc: "Pro · " + L("Monthly", "Buwanan") + " · " + ent.method,
-              net: "₱199.00",
-              status: L("Failed · retrying", "Bigo · sinusubukan ulit"),
-              color: "#B03A24",
-            },
-            {
-              no: "ULAT-000212",
-              date: "16 August 2026",
-              desc: "Pro · " + L("Monthly", "Buwanan") + " · " + ent.method,
-              net: "₱199.00",
-              status: L("Paid", "Bayad"),
-              color: "#0B807E",
-            },
-          ]
-        : [];
-  const invoices = [...st.invoices, ...seedInv];
+  const invoices: Invoice[] = (billing?.invoices ?? []).map((p) => ({
+    no: p.status === "paid" ? p.no : "—",
+    date: fmtLong(new Date(p.date + "T00:00:00")),
+    desc: p.desc,
+    net: peso(p.netCents),
+    status:
+      p.status === "paid"
+        ? p.netCents === 0
+          ? L("Paid by credit", "Bayad sa credit")
+          : L("Paid", "Bayad")
+        : p.status === "pending"
+          ? L("Awaiting payment", "Hinihintay ang bayad")
+          : L("Failed", "Bigo"),
+    color: p.status === "paid" ? "#0B807E" : p.status === "pending" ? "#8A6400" : "#B03A24",
+  }));
 
   return (
     <div className="-mr-2 flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto pr-2">

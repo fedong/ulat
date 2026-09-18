@@ -57,6 +57,18 @@ export function useEntitlement(): EntitlementCtx {
   }, [entState, payMethodPref, sub, subCancel, entApi, classes, editableIds, fil]);
 }
 
+/** Load live billing state into the store on mount (billing pages). */
+export function useBillingData() {
+  const signedIn = useUlat((s) => s.signedIn);
+  const billing = useUlat((s) => s.billing);
+  useEffect(() => {
+    if (!signedIn) return;
+    // Lazy import avoids a session ↔ hooks cycle at module load.
+    void import("./session").then((m) => m.refreshBilling().catch(() => {}));
+  }, [signedIn]);
+  return billing;
+}
+
 /** Per-student computed grades for the currently selected period. */
 export function usePeriodComputed(cls: Klass | undefined): Record<string, Computed> {
   const period = useUlat((s) => s.period);

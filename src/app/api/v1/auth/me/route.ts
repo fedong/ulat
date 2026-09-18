@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { publicUser, requireUser, unauthorized } from "@/server/auth";
-import { entitlementOf } from "@/server/entitlement";
+import { demoteIfLapsed, entitlementOf } from "@/server/entitlement";
 import { prisma } from "@/server/db";
 
 /** Profile + entitlement (payments spec §/v1/auth/me). */
 export async function GET(req: NextRequest) {
-  const user = await requireUser(req);
+  let user = await requireUser(req);
   if (!user) return unauthorized();
+  // Lapsed trials/subscriptions converge to FREE on read.
+  user = await demoteIfLapsed(user);
   return NextResponse.json({ user: publicUser(user), entitlement: entitlementOf(user) });
 }
 

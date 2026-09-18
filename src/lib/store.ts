@@ -140,6 +140,8 @@ interface UlatState {
   syncError: boolean;
   /** Signed-in account email (from /v1/auth/me). */
   email: string;
+  /** Live billing state (/v1/billing); null until a billing page loads it. */
+  billing: import("./api").BillingInfo | null;
   signup: boolean;
   authError: boolean;
   auth: AuthDraft;
@@ -216,6 +218,7 @@ export const useUlat = create<UlatState>((set, get) => ({
   entApi: null,
   syncError: false,
   email: "",
+  billing: null,
   signup: false,
   authError: false,
   auth: { email: "", pw: "", name: "", school: "" },

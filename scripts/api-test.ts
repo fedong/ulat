@@ -541,6 +541,137 @@ async function main() {
   kids2 = await api("GET", "/api/v1/guardian/children", { token: g2Tok });
   ok(kids2.body.children.length === 0, "revoked account link removes the children");
 
+  console.log("billing: checkout → entitlement → invoices");
+  let bill = await api("GET", "/api/v1/billing", { token });
+  ok(
+    bill.body.entitlement.state === "Free" &&
+      bill.body.creditCents === 0 &&
+      /^UL[0-9A-F]{8}$/.test(bill.body.referralCode),
+    "billing starts Free with a referral code and no credit",
+  );
+  const myRefCode: string = bill.body.referralCode;
+  ok(
+    (await api("POST", "/api/v1/billing/checkout", { token, body: { cycle: "Monthly", method: "GCash" } }))
+      .status === 400,
+    "GCash is rejected on the monthly plan",
+  );
+  const co1 = await api("POST", "/api/v1/billing/checkout", {
+    token,
+    body: { cycle: "Monthly", method: "Card" },
+  });
+  ok(
+    co1.status === 201 && co1.body.provider === "mock" && co1.body.netCents === 19900,
+    "monthly Card checkout starts on the sandbox provider",
+  );
+  bill = await api("GET", "/api/v1/billing", { token });
+  ok(bill.body.invoices[0]?.status === "pending", "the pending invoice is visible");
+  const paid1 = await api("POST", "/api/v1/billing/mock-pay", { token, body: { ref: co1.body.ref } });
+  ok(paid1.status === 200 && paid1.body.entitlement.state === "Active", "settlement activates Pro");
+  const until1 = new Date(paid1.body.entitlement.until + "T00:00:00").getTime();
+  ok(
+    Math.abs(until1 - (Date.now() + 30 * 864e5)) < 3 * 864e5 && paid1.body.entitlement.autoRenew,
+    "one month of Pro with auto-renew on",
+  );
+  ok(
+    (await api("POST", "/api/v1/classes", { token, body: { ...wizard, code: "QA105" } })).status === 201,
+    "the free 2-class limit lifts with Pro",
+  );
+
+  const co2 = await api("POST", "/api/v1/billing/checkout", {
+    token,
+    body: { cycle: "Annual", method: "GCash" },
+  });
+  const paid2 = await api("POST", "/api/v1/billing/mock-pay", { token, body: { ref: co2.body.ref } });
+  const until2 = new Date(paid2.body.entitlement.until + "T00:00:00").getTime();
+  ok(
+    Math.abs(until2 - (until1 + 365 * 864e5)) < 3 * 864e5,
+    "a yearly GCash payment stacks on the remaining month",
+  );
+  ok(
+    paid2.body.entitlement.autoRenew === false && paid2.body.entitlement.method === "GCash",
+    "GCash never auto-renews",
+  );
+  ok(
+    (await api("POST", "/api/v1/billing/cancel", { token, body: { resume: true } })).status === 400,
+    "GCash cannot resume auto-renewal",
+  );
+
+  console.log("billing: lapse transitions");
+  const meId: string = (await api("GET", "/api/v1/auth/me", { token })).body.user.id;
+  await prisma.user.update({
+    where: { id: meId },
+    data: { entState: "ACTIVE", entUntil: new Date(Date.now() - 2 * 864e5), entAutoRenew: true },
+  });
+  ok(
+    (await api("GET", "/api/v1/auth/me", { token })).body.entitlement.state === "Past due",
+    "expired with auto-renew reads Past due (still PRO)",
+  );
+  await prisma.user.update({ where: { id: meId }, data: { entAutoRenew: false } });
+  ok(
+    (await api("GET", "/api/v1/auth/me", { token })).body.entitlement.state === "Grace",
+    "expired manual renewal reads Grace",
+  );
+  await prisma.user.update({
+    where: { id: meId },
+    data: { entUntil: new Date(Date.now() - 10 * 864e5) },
+  });
+  ok(
+    (await api("GET", "/api/v1/auth/me", { token })).body.entitlement.state === "Free",
+    "grace exhausted demotes to Free",
+  );
+  ok(
+    (await prisma.user.findUnique({ where: { id: meId } }))?.entState === "FREE",
+    "the demotion persists",
+  );
+  const trialReg = await api("POST", "/api/v1/auth/register", {
+    body: { email: `qa.tr.${stamp}@example.com`, password },
+  });
+  await prisma.user.update({
+    where: { id: trialReg.body.user.id },
+    data: { entUntil: new Date(Date.now() - 864e5) },
+  });
+  ok(
+    (await api("GET", "/api/v1/auth/me", { token: trialReg.body.access })).body.entitlement.state ===
+      "Free",
+    "an expired trial reads Free",
+  );
+
+  console.log("billing: referral credit");
+  const refReg = await api("POST", "/api/v1/auth/register", {
+    body: { email: `qa.refb.${stamp}@example.com`, password, ref: myRefCode },
+  });
+  const refTok: string = refReg.body.access;
+  const co3 = await api("POST", "/api/v1/billing/checkout", {
+    token: refTok,
+    body: { cycle: "Annual", method: "Card" },
+  });
+  await api("POST", "/api/v1/billing/mock-pay", { token: refTok, body: { ref: co3.body.ref } });
+  bill = await api("GET", "/api/v1/billing", { token });
+  ok(
+    bill.body.creditCents === 19900 && bill.body.referredCount === 1,
+    "the referrer earns ₱199 on the referred first yearly payment",
+  );
+  const co4 = await api("POST", "/api/v1/billing/checkout", {
+    token,
+    body: { cycle: "Monthly", method: "Card" },
+  });
+  ok(
+    co4.status === 201 && co4.body.provider === "credit" && co4.body.netCents === 0,
+    "credit fully covers the next monthly bill — no provider round-trip",
+  );
+  bill = await api("GET", "/api/v1/billing", { token });
+  ok(
+    bill.body.creditCents === 0 &&
+      bill.body.entitlement.state === "Active" &&
+      bill.body.invoices[0].netCents === 0 &&
+      bill.body.invoices[0].status === "paid",
+    "credit is consumed, Pro reactivates, the ₱0 invoice is on file",
+  );
+  ok(
+    (await api("POST", "/api/v1/billing/webhook", { body: { any: "thing" } })).status === 401,
+    "webhook rejects unsigned payloads",
+  );
+
   console.log("demo student + guardian tours");
   const demoStu = await api("POST", "/api/v1/auth/login", {
     body: { email: "a.reyes@student.univ.edu.ph", password: "ulat-demo-2026" },

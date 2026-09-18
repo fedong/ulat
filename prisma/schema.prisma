@@ -36,10 +36,18 @@ model User {
   profile      Json     @default("{}")
 
   // Entitlement per the payments spec (§ /v1/auth/me).
-  entState  EntState  @default(TRIALING)
-  entUntil  DateTime?
-  entMethod String? // Card | Maya | GCash
-  entCycle  String? // Monthly | Annual
+  entState     EntState  @default(TRIALING)
+  entUntil     DateTime?
+  entMethod    String? // Card | Maya | GCash
+  entCycle     String? // Monthly | Annual
+  entAutoRenew Boolean   @default(false)
+
+  // Referrals: ₱199 credit toward future billing (never cashed out).
+  creditCents  Int     @default(0)
+  referralCode String? @unique
+  referredById String?
+  referredBy   User?   @relation("referrals", fields: [referredById], references: [id])
+  referrals    User[]  @relation("referrals")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -52,6 +60,31 @@ model User {
   guardianOf      GuardianStudent[] @relation("guardian")
   guardedBy       GuardianStudent[] @relation("student")
   studentInvites  StudentInvite[]
+  payments        Payment[]
+}
+
+/// One checkout → one row: pending until the provider confirms, then it is
+/// the invoice. `provider` is "paymongo" (live keys) or "mock" (sandbox).
+model Payment {
+  id          String    @id @default(cuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  no          String    @unique // ULAT-2026-0001
+  provider    String
+  providerRef String?   @unique // PayMongo checkout session id / mock ref
+  method      String // Card | Maya | GCash
+  cycle       String // Monthly | Annual
+  grossCents  Int
+  creditCents Int       @default(0)
+  netCents    Int
+  status      String    @default("pending") // pending | paid | failed
+  desc        String
+  paidAt      DateTime?
+  /// The entitlement end date this payment bought.
+  periodEnd   DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([userId])
 }
 
 /// Account-level guardian ↔ student link (student-initiated invites): every

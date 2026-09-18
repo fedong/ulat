@@ -19,6 +19,12 @@ export async function POST(req: NextRequest) {
   const existing = await prisma.user.findUnique({ where: { email } });
   if (existing) return badRequest("an account with this email already exists");
 
+  // Referral attribution: the referrer earns credit on the first paid year.
+  const ref = String(body?.ref || "").trim().toUpperCase();
+  const referrer = ref
+    ? await prisma.user.findUnique({ where: { referralCode: ref } })
+    : null;
+
   const trialEnds = new Date(Date.now() + 150 * 864e5); // 5 months
   const user = await prisma.user.create({
     data: {
@@ -27,6 +33,7 @@ export async function POST(req: NextRequest) {
       role,
       entState: role === "INSTRUCTOR" ? "TRIALING" : "FREE",
       entUntil: role === "INSTRUCTOR" ? trialEnds : null,
+      referredById: referrer && referrer.id !== undefined ? referrer.id : null,
       profile: {
         title: String(body?.title || ""),
         first: String(body?.first || ""),

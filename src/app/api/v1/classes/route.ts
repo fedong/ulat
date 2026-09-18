@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/server/db";
 import { badRequest, requireUser, unauthorized } from "@/server/auth";
 import { makeJoinCode } from "@/server/classes";
+import { entitlementOf } from "@/server/entitlement";
 import { classSummary } from "@/server/serialize";
 
 export async function GET(req: NextRequest) {
@@ -32,8 +33,8 @@ export async function POST(req: NextRequest) {
   if (!periods.length) return badRequest("at least one grading period is required");
   if (!b.grading?.groups?.length) return badRequest("a grading system is required");
 
-  // Free plan: 2 active classes.
-  if (user.entState === "FREE") {
+  // Free plan: 2 active classes (effective tier — lapsed Pro counts as Free).
+  if (entitlementOf(user).tier === "FREE") {
     const active = await prisma.class.count({ where: { ownerId: user.id, archived: false } });
     if (active >= 2)
       return NextResponse.json(

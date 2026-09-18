@@ -1,14 +1,19 @@
 "use client";
 
 import { billingStrings, peso } from "@/lib/billing";
-import { useEntitlement } from "@/lib/hooks";
+import { useBillingData, useEntitlement } from "@/lib/hooks";
 import { useUlat } from "@/lib/store";
 
 export default function ReferralsPage() {
   const st = useUlat();
   const { L, fil } = useEntitlement();
   const t = billingStrings(fil);
-  const creditAvail = st.creditUsed ? 0 : 19900;
+  const billing = useBillingData();
+  const creditAvail = billing?.creditCents ?? 0;
+  const refLink =
+    (typeof window !== "undefined" ? window.location.origin : "") +
+    "/signin?ref=" +
+    (billing?.referralCode ?? "…");
 
   const steps: [string, string][] = [
     [
@@ -30,19 +35,29 @@ export default function ReferralsPage() {
       ),
     ],
   ];
-  const referrals = [
-    {
-      name: "J. Dela Cruz",
-      status: st.creditUsed ? L("Awarded · ₱199 applied", "Naibigay · ₱199 nagamit") : L("Awarded · ₱199 credit", "Naibigay · ₱199 credit"),
-      color: "#0B807E",
-    },
-    { name: "R. Santos", status: L("Qualified · credit on 1 October", "Kwalipikado · credit sa 1 Oktubre"), color: "#8A6400" },
-    { name: "M. Villanueva", status: L("Signed up · not yet paid", "Naka-sign up · hindi pa bayad"), color: "#9AA3AB" },
-  ];
+  const referrals =
+    (billing?.referredCount ?? 0) > 0
+      ? [
+          {
+            name: L(
+              billing!.referredCount + (billing!.referredCount === 1 ? " colleague signed up" : " colleagues signed up"),
+              billing!.referredCount + (billing!.referredCount === 1 ? " kasamahan ang naka-sign up" : " kasamahan ang naka-sign up"),
+            ),
+            status: L("Credit lands on their first yearly payment", "Credit sa unang taunang bayad nila"),
+            color: "#0B807E",
+          },
+        ]
+      : [
+          {
+            name: L("No referrals yet", "Wala pang referral"),
+            status: L("Share your link to start", "Ibahagi ang link para magsimula"),
+            color: "#9AA3AB",
+          },
+        ];
 
   const copyRef = () => {
     try {
-      navigator.clipboard.writeText("https://ulat.ph/r/DRIVERA7");
+      navigator.clipboard.writeText(refLink);
     } catch {}
     st.set({ refCopied: true });
     setTimeout(() => useUlat.setState({ refCopied: false }), 1500);
@@ -68,7 +83,7 @@ export default function ReferralsPage() {
             <div className="min-w-0">
               <div className="label-caps text-sub">{t.yourLink}</div>
               <div className="mt-0.5 truncate font-display text-base font-extrabold tracking-[0.3px]">
-                ulat.ph/r/DRIVERA7
+                {refLink.replace(/^https?:\/\//, "")}
               </div>
             </div>
             <button

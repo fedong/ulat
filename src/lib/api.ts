@@ -115,6 +115,7 @@ export const register = async (b: {
   title?: string;
   first?: string;
   last?: string;
+  ref?: string;
 }) => adopt((await api.post("/api/v1/auth/register", b)) as AuthResponse);
 
 /** Re-mint tokens from the stored refresh token. Null = session expired. */
@@ -169,6 +170,43 @@ export async function loadAll(): Promise<{
 }
 
 export const saveProfile = (profile: Profile) => api.patch("/api/v1/auth/me", { profile });
+
+export interface InvoiceRow {
+  id: string;
+  no: string;
+  date: string; // yyyy-mm-dd
+  desc: string;
+  grossCents: number;
+  creditCents: number;
+  netCents: number;
+  status: "paid" | "pending" | "failed";
+}
+
+export interface BillingInfo {
+  entitlement: EntitlementDto;
+  creditCents: number;
+  referralCode: string;
+  referredCount: number;
+  invoices: InvoiceRow[];
+}
+
+export const getBilling = () => api.get("/api/v1/billing") as Promise<BillingInfo>;
+
+export interface CheckoutStart {
+  paymentId: string;
+  ref: string;
+  provider: "paymongo" | "mock" | "credit";
+  url: string | null;
+  netCents: number;
+}
+
+export const startProCheckout = (cycle: PlanCycle, method: PayMethod) =>
+  api.post("/api/v1/billing/checkout", { cycle, method }) as Promise<CheckoutStart>;
+
+/** Sandbox settlement (no live keys): plays the provider webhook. */
+export const settleMockPayment = (ref: string) => api.post("/api/v1/billing/mock-pay", { ref });
+
+export const setRenewal = (resume: boolean) => api.post("/api/v1/billing/cancel", { resume });
 
 export const fetchClass = async (id: string) =>
   ((await api.get(`/api/v1/classes/${id}`)) as { class: Klass }).class;
