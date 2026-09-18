@@ -87,6 +87,9 @@ Endpoints (all JSON, `Authorization: Bearer <access>` after auth):
 | `POST/PATCH/DELETE /api/v1/classes/[id]/sessions` | Start today's session (idempotent, everyone Present), set one mark (A/E carry into same-day assessments unless hand-edited), discard (reverses only auto-carried scores) — addressed by id or `(date, groupId)` |
 | `GET/POST/DELETE /api/v1/classes/[id]/guardians` | Sharing state per student (enrollment + links), create a guardian invite (returns the claim code), revoke |
 | `POST /api/v1/join` | Student joins a class: join code + student number or name, matched against the roster |
+| `GET /api/v1/join/[code]` · `GET /api/v1/invites/[code]` | Public lookups behind the QR/landing pages (`/join/[code]`, `/g/[code]`) — class info, or the invited student's first name + role |
+| `POST /api/v1/student/invite` · `GET /api/v1/student/guardians` | Student-driven guardian invite (account-level: follows every class, current and future) and their guardian list |
+| `POST /api/v1/classes/[id]/nudge` | "Ask student": a prompt in the student's app to invite a guardian |
 | `GET /api/v1/student/classes` | The student's scoped view of each enrolled class (own row/scores/marks only, never the join code) — still the `Klass` shape, so the shared grade engine runs on it |
 | `POST /api/v1/guardian/claim` · `GET /api/v1/guardian/children` | Claim an invite code; children with scope-gated class views (Grades and Attendance always shared, "Missing work"/Remarks per class policy, remarks stripped server-side when off) |
 
@@ -186,5 +189,20 @@ stripped server-side when off). The mobile student and guardian roles run on
 these views end to end — multi-class live cards, component breakdowns, alerts
 and empty states that walk new accounts through joining or linking — while
 the seeded demo tour keeps its static showcase classes beside the live one.
+
+The onboarding loop closes with QR codes and student-driven invites. The
+class join code is also a QR (encoding `/join/[code]`): instructors project
+it full-screen from Settings (or the wizard), students scan it with their
+camera and land on a branded page that walks them in — or straight into the
+app via the `ulat://` deep link, code prefilled. Guardians connect the way
+families actually communicate: the student taps "Invite my guardian" in
+their Me tab and gets a code + QR + share sheet, so the invite travels over
+Messenger/SMS/anything with zero delivery infrastructure — and the link is
+account-level, so every class the student joins later shares automatically.
+Teacher-created invites remain for conferences and school-driven onboarding
+(same claim endpoint), the Sharing page shows account-linked guardians and
+can revoke them, and "Ask student" now raises a real prompt in the student's
+app. Refresh-token rotation gained a grace window so quick page hops can't
+burn a session.
 
 Next milestone: payments (PayMongo) & entitlements, then the Coolify deploy.

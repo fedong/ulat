@@ -9,6 +9,7 @@ import {
   signIn,
   signOut,
   studentClasses,
+  studentGuardians,
   type EntitlementDto,
   type MeProfile,
 } from "./api";
@@ -46,9 +47,10 @@ async function hydrateInstructor() {
 }
 
 async function hydrateStudent() {
-  const [info, rows] = await Promise.all([me(), studentClasses()]);
+  const [info, rows, guardians] = await Promise.all([me(), studentClasses(), studentGuardians()]);
   useUlat.setState({
     sLive: rows,
+    sGuardians: guardians,
     email: info.user.email,
     meName: displayName(info.user.profile, rows[0]?.studentName || "Student"),
     lang: info.user.profile.lang === "Filipino" ? "Filipino" : "English",
@@ -131,6 +133,7 @@ export async function doSignOut() {
     classes: [],
     clsId: "",
     sLive: null,
+    sGuardians: null,
     gKids: null,
     email: "",
     meName: "",

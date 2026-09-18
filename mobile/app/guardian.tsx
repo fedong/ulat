@@ -50,11 +50,15 @@ export default function GuardianScreen() {
   return <GuardianInner />;
 }
 
-/** Empty state: link the first child with the instructor's invite code. */
+/** Empty state: link the first child with an invite code (or scanned link). */
 function ClaimInviteCard() {
-  const [code, setCode] = useState("");
+  const pending = useUlat((s) => s.pendingClaimCode);
+  const [code, setCode] = useState(pending || "");
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    if (pending) useUlat.setState({ pendingClaimCode: null });
+  }, [pending]);
   const claim = async () => {
     if (busy) return;
     if (!code.trim()) return setErr("Enter the invite code from the instructor.");

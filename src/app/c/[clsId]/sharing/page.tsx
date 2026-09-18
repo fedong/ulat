@@ -16,7 +16,10 @@ interface GuardianRow {
   date: string;
 }
 
-type SharingState = Record<string, { enrolled: boolean; guardians: GuardianRow[] }>;
+type SharingState = Record<
+  string,
+  { enrolled: boolean; nudgedAt: number | null; guardians: GuardianRow[] }
+>;
 
 const HOW_IT_WORKS: [string, React.ReactNode][] = [
   [
@@ -93,7 +96,7 @@ export default function SharingPage({ params }: { params: Promise<{ clsId: strin
     });
 
   const consents = roster.map((r) => {
-    const row = sharing[r.id] || { enrolled: false, guardians: [] };
+    const row = sharing[r.id] || { enrolled: false, nudgedAt: null, guardians: [] };
     const linked = row.guardians.filter((g) => g.status === "active");
     const invited = row.guardians.filter((g) => g.status === "invited");
     const guardians = [...linked, ...invited].map((g) => {
@@ -108,7 +111,7 @@ export default function SharingPage({ params }: { params: Promise<{ clsId: strin
       : nPending
         ? "Invited " + fmtDate(invited[0].date)
         : "—";
-    const wasNudged = !!st.nudged[r.id];
+    const wasNudged = !!st.nudged[r.id] || !!row.nudgedAt;
     const first = r.name.split(",")[1].trim().split(" ")[0];
     const open = st.linkFor === r.id;
     return {
@@ -127,10 +130,15 @@ export default function SharingPage({ params }: { params: Promise<{ clsId: strin
       nudge: () => {
         if (wasNudged) return;
         st.set({ nudged: { ...st.nudged, [r.id]: true } });
+        if (!nPending && row.enrolled)
+          // Real prompt in the student's app: "invite your guardian".
+          void api.post(`/api/v1/classes/${clsId}/nudge`, { studentRowId: r.id }).catch(() => {});
         toast(
           nPending
             ? "Reminder sent to " + invited.map((g) => g.name).join(" and ") + " to finish registering."
-            : first + " is asked to submit a guardian's name, role and contact number.",
+            : row.enrolled
+              ? first + " will see a prompt in their app to invite a guardian."
+              : first + " is asked to submit a guardian's name, role and contact number.",
         );
       },
       canLink: !open,
@@ -158,13 +166,16 @@ export default function SharingPage({ params }: { params: Promise<{ clsId: strin
             })) as { code: string };
             st.set({ linkFor: null, linkName: "", linkContact: "", linkRole: "Mother" });
             await refresh();
+            const link = `${window.location.origin}/g/${res.code}`;
             toast(
               name +
-                " signs in to the Ulat app as a guardian and enters the code " +
+                " opens " +
+                link +
+                " (or enters the code " +
                 res.code +
-                " to start following " +
+                " in the Ulat app as a guardian) to start following " +
                 first +
-                ". Share it with them directly for now — invites by SMS/email arrive with notifications.",
+                ". Share the link over Messenger or any chat — it explains the steps.",
               "Invite created — code " + res.code,
             );
           } catch {

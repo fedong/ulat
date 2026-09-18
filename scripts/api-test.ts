@@ -76,10 +76,12 @@ async function main() {
     body: { refresh: login.body.refresh },
   });
   ok(rot.status === 200 && rot.body.access, "refresh rotates tokens");
+  // Rotation keeps the old token alive briefly (grace window), so a client
+  // that lost the new token mid-navigation recovers instead of signing out.
   const reuse = await api("POST", "/api/v1/auth/refresh", {
     body: { refresh: login.body.refresh },
   });
-  ok(reuse.status === 401, "rotated refresh token cannot be reused");
+  ok(reuse.status === 200, "just-rotated token still works inside the grace window");
   token = rot.body.access;
 
   console.log("classes");
@@ -457,6 +459,87 @@ async function main() {
   ok(unlink.status === 200, "guardian link revoked");
   kids = await api("GET", "/api/v1/guardian/children", { token: grdTok });
   ok(kids.body.children.length === 0, "revoked link removes the child view");
+
+  console.log("QR landing lookups + nudge");
+  const pubJoin = await api("GET", `/api/v1/join/${joinCode}`);
+  ok(pubJoin.status === 200 && pubJoin.body.code === "QA101", "public join lookup names the class");
+  ok((await api("GET", "/api/v1/join/NOPE99")).status === 404, "unknown join code is 404");
+  const nudge = await api("POST", `/api/v1/classes/${cid}/nudge`, {
+    token,
+    body: { studentRowId: ana },
+  });
+  ok(nudge.status === 200, "instructor nudges the student");
+  const sharing2 = await api("GET", `/api/v1/classes/${cid}/guardians`, { token });
+  ok(typeof sharing2.body.students[ana].nudgedAt === "number", "nudge persists on the sharing state");
+  const stuView2 = await api("GET", "/api/v1/student/classes", { token: stuTok });
+  ok(
+    typeof stuView2.body.classes[0].guardianNudge === "number",
+    "the student's app sees the nudge",
+  );
+
+  console.log("student-driven guardian invite (account-level)");
+  const sInv = await api("POST", "/api/v1/student/invite", {
+    token: stuTok,
+    body: { role: "Mother" },
+  });
+  ok(sInv.status === 201 && sInv.body.code.length === 12, "student creates an invite code");
+  const sInv2 = await api("POST", "/api/v1/student/invite", {
+    token: stuTok,
+    body: { role: "Mother" },
+  });
+  ok(sInv2.body.code === sInv.body.code, "asking again returns the same live code");
+  const sg = await api("GET", "/api/v1/student/guardians", { token: stuTok });
+  ok(
+    sg.body.invites.some((i: { code: string }) => i.code === sInv.body.code),
+    "the open invite shows on the student's guardian list",
+  );
+  const pubInv = await api("GET", `/api/v1/invites/${sInv.body.code}`);
+  ok(
+    pubInv.status === 200 && pubInv.body.studentFirst === "Ana" && pubInv.body.role === "Mother",
+    "public invite lookup reveals only first name + role",
+  );
+
+  const g2 = await api("POST", "/api/v1/auth/register", {
+    body: { email: `qa.grd2.${stamp}@example.com`, password, role: "guardian", first: "Mila", last: "Alpha" },
+  });
+  const g2Tok: string = g2.body.access;
+  const claim2 = await api("POST", "/api/v1/guardian/claim", {
+    token: g2Tok,
+    body: { code: sInv.body.code },
+  });
+  ok(claim2.status === 201, "guardian claims the student's invite");
+  let kids2 = await api("GET", "/api/v1/guardian/children", { token: g2Tok });
+  ok(
+    kids2.body.children.length === 1 && kids2.body.children[0].classes.length === 1,
+    "account link covers the student's current class",
+  );
+  // The account link follows the student into classes they join later.
+  const qa102 = (await api("GET", "/api/v1/classes", { token })).body.classes.find(
+    (c: { code: string }) => c.code === "QA102",
+  );
+  const qa102Full = await api("GET", `/api/v1/classes/${qa102.id}`, { token });
+  const join102 = await api("POST", "/api/v1/join", {
+    token: stuTok,
+    body: { code: qa102Full.body.class.joinCode, name: "Alpha, Ana" },
+  });
+  ok(join102.status === 201, "student joins a second class");
+  kids2 = await api("GET", "/api/v1/guardian/children", { token: g2Tok });
+  ok(
+    kids2.body.children[0].classes.length === 2,
+    "the account-level guardian follows the new class automatically",
+  );
+  const sharing3 = await api("GET", `/api/v1/classes/${cid}/guardians`, { token });
+  const acct = sharing3.body.students[ana].guardians.find((x: { id: string }) =>
+    x.id.startsWith("acct:"),
+  );
+  ok(acct && acct.name === "Mila Alpha", "the account link shows on the instructor's Sharing page");
+  const unlink2 = await api("DELETE", `/api/v1/classes/${cid}/guardians`, {
+    token,
+    body: { linkId: acct.id },
+  });
+  ok(unlink2.status === 200, "instructor can revoke the account link");
+  kids2 = await api("GET", "/api/v1/guardian/children", { token: g2Tok });
+  ok(kids2.body.children.length === 0, "revoked account link removes the children");
 
   console.log("demo student + guardian tours");
   const demoStu = await api("POST", "/api/v1/auth/login", {

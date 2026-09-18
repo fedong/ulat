@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import type { Klass } from "@ulat/grade-math";
-import type { EntitlementDto, GuardianChild, StudentClassRow } from "./api";
+import type { EntitlementDto, GuardianChild, StudentClassRow, StudentGuardians } from "./api";
 import { todayIso } from "./derive";
 import { syncClassPatch } from "./sync";
 
@@ -34,8 +34,13 @@ interface UlatMobile {
   ent: EntitlementDto | null;
   /** Student role: live per-class views (null until hydrated). */
   sLive: StudentClassRow[] | null;
+  /** Student role: linked guardians + open invite codes. */
+  sGuardians: StudentGuardians | null;
   /** Guardian role: live children with scope-gated views (null until hydrated). */
   gKids: GuardianChild[] | null;
+  /** Codes carried in from a scanned deep link, consumed by the join/claim cards. */
+  pendingJoinCode: string | null;
+  pendingClaimCode: string | null;
 
   // Instructor (4b)
   ptabI: ITab;
@@ -74,7 +79,10 @@ export const useUlat = create<UlatMobile>((set, get) => ({
   meName: "",
   ent: null,
   sLive: null,
+  sGuardians: null,
   gKids: null,
+  pendingJoinCode: null,
+  pendingClaimCode: null,
 
   ptabI: "classes",
   phoneAsmId: null,

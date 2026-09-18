@@ -72,6 +72,25 @@ try {
   await page.getByText("on Ulat", { exact: true }).first().waitFor();
   ok(true, "sharing shows the live guardian link and Ana's enrollment");
 
+  console.log("join QR projection + landing pages");
+  await page.goto(`${BASE}/c/cs101/settings`);
+  await page.getByText("Project QR", { exact: true }).click();
+  await page.getByText("Join CS101 on Ulat", { exact: false }).waitFor({ timeout: 15000 });
+  await page.locator("img[alt^='QR code']").first().waitFor();
+  ok(true, "projection view shows the giant QR and code");
+  await page.keyboard.press("Escape");
+
+  await page.goto(`${BASE}/join/CS1A2Q`);
+  await page.getByText("CS101 · Intro to Computing", { exact: false }).waitFor({ timeout: 15000 });
+  await page.getByText("I'm a student", { exact: false }).first().waitFor();
+  ok(true, "public join landing page resolves the class");
+
+  await page.goto(`${BASE}/g/NOSUCHCODE00`);
+  await page.getByText("This invite isn't active", { exact: false }).waitFor({ timeout: 15000 });
+  ok(true, "guardian landing page handles unknown codes");
+  await page.goto(`${BASE}/c/cs101/overview`);
+  await page.getByText("CS101 · Intro to Computing").first().waitFor({ timeout: 15000 });
+
   console.log("saved indicator");
   await page.getByText("All changes saved", { exact: false }).waitFor({ timeout: 5000 });
   ok(true, "header shows all changes saved");

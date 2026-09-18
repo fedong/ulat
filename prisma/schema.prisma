@@ -48,6 +48,38 @@ model User {
   refreshTokens RefreshToken[]
   enrollments   Enrollment[]
   guardianLinks GuardianLink[]
+
+  guardianOf      GuardianStudent[] @relation("guardian")
+  guardedBy       GuardianStudent[] @relation("student")
+  studentInvites  StudentInvite[]
+}
+
+/// Account-level guardian ↔ student link (student-initiated invites): every
+/// class the student joins, now or later, shares under its own policy.
+model GuardianStudent {
+  id            String   @id @default(cuid())
+  guardianId    String
+  guardian      User     @relation("guardian", fields: [guardianId], references: [id], onDelete: Cascade)
+  studentUserId String
+  student       User     @relation("student", fields: [studentUserId], references: [id], onDelete: Cascade)
+  role          String   @default("Guardian") // Mother | Father | Grandparent | Guardian
+  createdAt     DateTime @default(now())
+
+  @@unique([guardianId, studentUserId])
+  @@index([studentUserId])
+}
+
+/// A student's "Invite my guardian" code, claimed by a guardian account.
+model StudentInvite {
+  id            String    @id @default(cuid())
+  studentUserId String
+  student       User      @relation(fields: [studentUserId], references: [id], onDelete: Cascade)
+  role          String    @default("Guardian")
+  code          String    @unique
+  claimedAt     DateTime?
+  createdAt     DateTime  @default(now())
+
+  @@index([studentUserId])
 }
 
 /// A student account claimed one roster row via the class join code.
@@ -148,6 +180,8 @@ model StudentRow {
   /// Soft removal: scores and marks stay in the data but the student is no
   /// longer counted or shown; re-adding by the same student number restores.
   removedAt   DateTime?
+  /// "Ask student" from the Sharing page: prompt them to invite a guardian.
+  guardianNudgeAt DateTime?
 
   scores        Score[]
   enrollment    Enrollment?

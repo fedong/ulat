@@ -150,6 +150,13 @@ export interface StudentClassRow {
   studentRowId: string;
   studentName: string;
   instructor: string;
+  /** Instructor's "invite a guardian" prompt (epoch ms), if sent. */
+  guardianNudge?: number | null;
+}
+
+export interface StudentGuardians {
+  guardians: { name: string; role: string; status: "linked" }[];
+  invites: { code: string; role: string }[];
 }
 
 export interface GuardianChild {
@@ -174,5 +181,16 @@ export const guardianChildren = async () =>
 export const joinClass = (code: string, opts: { studentNo?: string; name?: string }) =>
   api.post("/join", { code, ...opts });
 
-/** Guardian claims an invite code from the instructor. */
+/** Guardian claims an invite code (from the instructor or the student). */
 export const claimInvite = (code: string) => api.post("/guardian/claim", { code });
+
+/** Student's linked guardians + open invite codes. */
+export const studentGuardians = async () =>
+  (await api.get("/student/guardians")) as StudentGuardians;
+
+/** Student creates (or re-fetches) their guardian invite code. */
+export const createStudentInvite = async (role: string) =>
+  (await api.post("/student/invite", { role })) as { code: string; role: string };
+
+/** Public origin serving the /g and /join landing pages (same host as the API). */
+export const webOrigin = () => HOST;

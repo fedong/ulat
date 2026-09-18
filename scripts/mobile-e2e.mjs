@@ -91,6 +91,14 @@ try {
   await visS("Your standing", false).waitFor({ timeout: 10000 });
   await visS("Weighted total").waitFor();
   ok(true, "class detail shows the live component breakdown");
+
+  await visS("Me").click();
+  await visS("Your guardians").waitFor({ timeout: 10000 });
+  await visS("Invite my guardian").click();
+  await visS("Grandparent").click();
+  await visS("Create invite").click();
+  await visS("Share invite").waitFor({ timeout: 15000 });
+  ok(true, "student creates a guardian invite with QR + share");
   await ctxS.close();
 
   console.log("guardian role (live account)");

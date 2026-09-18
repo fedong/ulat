@@ -9,6 +9,7 @@ import { DEMO_INSTRUCTOR, profileShownName } from "@/lib/derive";
 import { scaleLabel, SCALES, shown, standing, txBase } from "@/lib/grading";
 import { useEntitlement, useMounted, usePageTitle } from "@/lib/hooks";
 import { newId, PRESETS, uid } from "@/lib/presets";
+import { joinUrl, QrCode } from "@/components/QrCode";
 import { syncCreateClass } from "@/lib/sync";
 import { profileInitials } from "@/lib/derive";
 import { mkClass } from "@/lib/seed";
@@ -22,7 +23,6 @@ import {
   mergeRoster,
   parseCells,
   parseRows,
-  qrCells,
   readPdfCells,
   readXlsxCells,
   schedText,
@@ -926,13 +926,8 @@ export default function NewClassPage() {
                   <div className="flex flex-1 flex-col overflow-y-auto">
                     {d.roster.length === 0 && (
                       <div className="flex flex-1 flex-col items-center justify-center gap-2 px-6 py-8 text-center text-sm leading-[1.5] text-faint">
-                        <div
-                          className="grid h-[148px] w-[148px] rounded-xl border border-line bg-white p-2"
-                          style={{ gridTemplateColumns: "repeat(25,1fr)", gridTemplateRows: "repeat(25,1fr)" }}
-                        >
-                          {qrCells(d.joinCode).map((c, i) => (
-                            <span key={i} style={{ background: c }} />
-                          ))}
+                        <div className="rounded-xl border border-line bg-white p-2">
+                          <QrCode value={joinUrl(d.joinCode)} size={132} />
                         </div>
                         <div className="mt-1.5 flex flex-col items-center gap-1.5 text-[13px] font-medium text-sub">
                           Scan to join, or enter the code

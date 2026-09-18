@@ -1,7 +1,8 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { use } from "react";
+import { use, useState } from "react";
+import { ProjectJoinOverlay } from "@/components/QrCode";
 import { consultSummary, DEMO_INSTRUCTOR, honor, initialsOf } from "@/lib/derive";
 import { periodOf, periodWeight, SCALES, shown, standing, txBase } from "@/lib/grading";
 import { PRESETS, uid } from "@/lib/presets";
@@ -26,6 +27,7 @@ export default function SettingsPage({ params }: { params: Promise<{ clsId: stri
   const router = useRouter();
   const st = useUlat();
   const cls = useClass(clsId);
+  const [projecting, setProjecting] = useState(false);
   if (!cls) return null;
 
   const gs = cls.grading;
@@ -153,6 +155,14 @@ export default function SettingsPage({ params }: { params: Promise<{ clsId: stri
       data-tour="settings"
       className="-mr-2 flex min-h-0 flex-1 flex-col gap-7 overflow-y-auto pr-2"
     >
+      {projecting && (
+        <ProjectJoinOverlay
+          code={cls.joinCode}
+          klassCode={cls.code}
+          title={cls.title + " · " + cls.section}
+          onClose={() => setProjecting(false)}
+        />
+      )}
       {/* 1 · Grading components */}
       <div className="mx-auto w-full flex max-w-[960px] flex-col gap-3">
         <div className="flex items-center justify-between gap-4 px-0.5">
@@ -563,10 +573,18 @@ export default function SettingsPage({ params }: { params: Promise<{ clsId: stri
                 className="h-9 w-[190px] rounded-full border-[1.5px] border-dashed border-[#D9D3C7] bg-transparent px-3.5 text-[13px] font-medium outline-none focus:border-teal"
               />
             </div>
-            <div className="flex items-center justify-between border-t border-line pt-2.5 text-sm font-medium">
+            <div className="flex items-center justify-between gap-3 border-t border-line pt-2.5 text-sm font-medium">
               <span>Class code for joining</span>
-              <span className="rounded-lg border border-line bg-canvas px-2.5 py-1 font-display text-base font-extrabold tracking-[1px]">
-                {cls.joinCode}
+              <span className="flex items-center gap-2">
+                <span className="rounded-lg border border-line bg-canvas px-2.5 py-1 font-display text-base font-extrabold tracking-[1px]">
+                  {cls.joinCode}
+                </span>
+                <button
+                  onClick={() => setProjecting(true)}
+                  className="cursor-pointer rounded-lg bg-teal px-3 py-1.5 text-xs font-bold text-white"
+                >
+                  Project QR
+                </button>
               </span>
             </div>
           </div>

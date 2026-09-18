@@ -27,6 +27,7 @@ export async function GET(req: NextRequest) {
         studentRowId: e.studentRowId,
         studentName: e.studentRow.name,
         instructor: instructorNameOf(cls.owner.profile),
+        guardianNudge: e.studentRow.guardianNudgeAt?.getTime() ?? null,
       };
     }),
   );

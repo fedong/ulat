@@ -15,31 +15,65 @@ export async function GET(req: NextRequest, ctx: Ctx) {
 
   const sids = r.cls.students.map((s) => s.id);
   const [enrollments, links] = await Promise.all([
-    prisma.enrollment.findMany({ where: { studentRowId: { in: sids } } }),
+    prisma.enrollment.findMany({
+      where: { studentRowId: { in: sids } },
+      include: {
+        user: {
+          select: {
+            guardedBy: { include: { guardian: { select: { profile: true, email: true } } } },
+          },
+        },
+      },
+    }),
     prisma.guardianLink.findMany({
       where: { studentRowId: { in: sids } },
       orderBy: { createdAt: "asc" },
     }),
   ]);
+  // Student-invited guardians (account-level) show on every class's row.
+  const accountBySid = new Map(
+    enrollments.map((e) => [
+      e.studentRowId,
+      e.user.guardedBy.map((l) => {
+        const p = (l.guardian.profile ?? {}) as { first?: string; last?: string };
+        return {
+          id: "acct:" + l.id,
+          name: [p.first, p.last].filter(Boolean).join(" ") || l.guardian.email,
+          role: l.role,
+          contact: "",
+          status: "active",
+          code: undefined as string | undefined,
+          date: l.createdAt.toISOString().slice(0, 10),
+        };
+      }),
+    ]),
+  );
   const enrolled = new Set(enrollments.map((e) => e.studentRowId));
+  const nudgedAt = new Map(
+    r.cls.students.map((s) => [s.id, s.guardianNudgeAt?.getTime() ?? null]),
+  );
   return NextResponse.json({
     students: Object.fromEntries(
       sids.map((sid) => [
         sid,
         {
           enrolled: enrolled.has(sid),
-          guardians: links
-            .filter((l) => l.studentRowId === sid)
-            .map((l) => ({
-              id: l.id,
-              name: l.name,
-              role: l.role,
-              contact: l.contact,
-              status: l.status,
-              // The claim code is only shown while the invite is unclaimed.
-              code: l.status === "invited" ? l.code : undefined,
-              date: l.createdAt.toISOString().slice(0, 10),
-            })),
+          nudgedAt: nudgedAt.get(sid) ?? null,
+          guardians: [
+            ...(accountBySid.get(sid) ?? []),
+            ...links
+              .filter((l) => l.studentRowId === sid)
+              .map((l) => ({
+                id: l.id,
+                name: l.name,
+                role: l.role,
+                contact: l.contact,
+                status: l.status,
+                // The claim code is only shown while the invite is unclaimed.
+                code: l.status === "invited" ? l.code : undefined,
+                date: l.createdAt.toISOString().slice(0, 10),
+              })),
+          ],
         },
       ]),
     ),
@@ -78,6 +112,19 @@ export async function DELETE(req: NextRequest, ctx: Ctx) {
   const b = await req.json().catch(() => null);
   const linkId = String(b?.linkId || "");
   const sids = new Set(r.cls.students.map((s) => s.id));
+
+  // Account-level links (student-invited) unlink the guardian everywhere.
+  if (linkId.startsWith("acct:")) {
+    const gs = await prisma.guardianStudent.findUnique({
+      where: { id: linkId.slice(5) },
+      include: { student: { select: { enrollments: { select: { studentRowId: true } } } } },
+    });
+    if (!gs || !gs.student.enrollments.some((e) => sids.has(e.studentRowId)))
+      return badRequest("unknown link");
+    await prisma.guardianStudent.delete({ where: { id: gs.id } });
+    return NextResponse.json({ ok: true });
+  }
+
   const link = await prisma.guardianLink.findUnique({ where: { id: linkId } });
   if (!link || !sids.has(link.studentRowId)) return badRequest("unknown link");
   await prisma.guardianLink.delete({ where: { id: linkId } });

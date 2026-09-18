@@ -39,14 +39,27 @@ export async function issueRefreshToken(userId: string) {
   return token;
 }
 
-/** Rotate: verify, revoke the old row, issue a fresh pair. */
+/**
+ * Rotate: verify, retire the old row, issue a fresh pair. The old token
+ * stays usable for a short grace window (revokedAt set in the future): a
+ * client that navigates away before persisting the new token — or two tabs
+ * refreshing at once — recovers instead of getting signed out. An explicit
+ * logout revokes immediately.
+ */
+const ROTATION_GRACE_MS = 60_000;
+
 export async function rotateRefreshToken(token: string) {
   const row = await prisma.refreshToken.findUnique({
     where: { tokenHash: createHash("sha256").update(token).digest("hex") },
     include: { user: true },
   });
-  if (!row || row.revokedAt || row.expiresAt < new Date()) return null;
-  await prisma.refreshToken.update({ where: { id: row.id }, data: { revokedAt: new Date() } });
+  if (!row || (row.revokedAt && row.revokedAt <= new Date()) || row.expiresAt < new Date())
+    return null;
+  if (!row.revokedAt)
+    await prisma.refreshToken.update({
+      where: { id: row.id },
+      data: { revokedAt: new Date(Date.now() + ROTATION_GRACE_MS) },
+    });
   return {
     user: row.user,
     access: await signAccessToken(row.user),

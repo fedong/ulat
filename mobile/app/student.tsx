@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { router } from "expo-router";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, Share, StyleSheet, Text, View } from "react-native";
 import {
   attColor,
   attRate,
@@ -21,9 +21,10 @@ import {
   passingLineOf,
   todayIso,
 } from "@/derive";
-import { ApiError } from "@/api";
+import { ApiError, createStudentInvite, webOrigin } from "@/api";
 import { OTHER_CLASSES, type StaticClass, type UpcomingItem } from "@/demo";
 import { currentPeriodOf } from "@/live";
+import { QrSvg } from "@/qr";
 import { doJoinClass, doSignOut } from "@/session";
 import { useUlat, type STab } from "@/store";
 import { C, F } from "@/theme";
@@ -160,10 +161,15 @@ export default function StudentScreen() {
 
 /** Empty state: join the first class with the instructor's code. */
 function JoinClassCard() {
-  const [code, setCode] = useState("");
+  // A scanned QR / tapped link lands here with the code already known.
+  const pending = useUlat((s) => s.pendingJoinCode);
+  const [code, setCode] = useState(pending || "");
   const [no, setNo] = useState("");
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    if (pending) useUlat.setState({ pendingJoinCode: null });
+  }, [pending]);
   const join = async () => {
     if (busy) return;
     if (!code.trim() || !no.trim())
@@ -228,6 +234,155 @@ const sj = StyleSheet.create({
     color: C.ink,
   },
 });
+
+const ROLES = ["Mother", "Father", "Grandparent", "Guardian"] as const;
+
+/**
+ * Me tab: linked guardians + "Invite my guardian". The invite is a code, a
+ * QR (scan it straight off this screen) and a share button — the invite link
+ * travels over whatever chat the family already uses.
+ */
+function GuardiansCard({ fil }: { fil: boolean }) {
+  const st = useUlat();
+  const g = st.sGuardians;
+  const [picking, setPicking] = useState(false);
+  const [role, setRole] = useState<(typeof ROLES)[number]>("Mother");
+  const [invite, setInvite] = useState<{ code: string; role: string } | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const create = async () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const r = await createStudentInvite(role);
+      setInvite(r);
+      setPicking(false);
+      // Keep the open-invites list in step without a refetch.
+      if (g && !g.invites.some((i) => i.code === r.code))
+        useUlat.setState({ sGuardians: { ...g, invites: [...g.invites, r] } });
+    } catch {
+      st.toast(fil ? "Hindi nagawa ang invite — subukan muli" : "Couldn't create the invite — try again");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const share = async () => {
+    if (!invite) return;
+    const url = `${webOrigin()}/g/${invite.code}`;
+    try {
+      await Share.share({
+        message:
+          (fil
+            ? "Sundan ang grades ko sa Ulat: "
+            : "Follow my grades on Ulat: ") +
+          url +
+          (fil
+            ? ` — o ilagay ang code ${invite.code} sa app (I'm a guardian).`
+            : ` — or enter the code ${invite.code} in the app (I'm a guardian).`),
+      });
+    } catch {}
+  };
+
+  const shown = invite || g?.invites[0] || null;
+  return (
+    <Card style={{ gap: 10 }}>
+      <SectionTitle>{fil ? "Mga guardian" : "Your guardians"}</SectionTitle>
+      {(g?.guardians ?? []).map((x, i) => (
+        <View
+          key={i}
+          style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}
+        >
+          <Text style={{ fontFamily: F.b700, fontSize: 13, color: C.ink }}>{x.name}</Text>
+          <Text style={{ fontFamily: F.b500, fontSize: 12, color: C.sub }}>
+            {x.role} · {fil ? "naka-link" : "linked"}
+          </Text>
+        </View>
+      ))}
+      {(g?.guardians ?? []).length === 0 && (
+        <Text style={{ fontFamily: F.b400, fontSize: 13, color: C.sub, lineHeight: 19 }}>
+          {fil
+            ? "Wala ka pang naka-link na guardian. I-invite sila — makikita nila ang standing at attendance mo sa lahat ng klase."
+            : "No guardian linked yet. Invite one — they'll follow your standing and attendance across all your classes."}
+        </Text>
+      )}
+
+      {shown && (
+        <View style={{ alignItems: "center", gap: 8, paddingVertical: 6 }}>
+          <QrSvg value={`${webOrigin()}/g/${shown.code}`} size={150} />
+          <Text style={{ fontFamily: F.d800, fontSize: 20, letterSpacing: 3, color: C.tealText }}>
+            {shown.code}
+          </Text>
+          <Text style={{ fontFamily: F.b400, fontSize: 12, color: C.sub, textAlign: "center", lineHeight: 17 }}>
+            {fil
+              ? `Para sa ${shown.role}. Ipa-scan ang QR, o i-share ang link.`
+              : `For your ${shown.role.toLowerCase()}. Have them scan this, or share the link.`}
+          </Text>
+          <PrimaryButton
+            label={fil ? "I-share ang invite" : "Share invite"}
+            onPress={() => void share()}
+            height={42}
+            style={{ alignSelf: "stretch" }}
+          />
+        </View>
+      )}
+
+      {picking ? (
+        <View style={{ gap: 8 }}>
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
+            {ROLES.map((r) => (
+              <Pressable
+                key={r}
+                onPress={() => setRole(r)}
+                style={{
+                  paddingHorizontal: 12,
+                  paddingVertical: 7,
+                  borderRadius: 999,
+                  borderWidth: 1.5,
+                  borderColor: role === r ? C.teal : C.line,
+                  backgroundColor: role === r ? C.tealTint10 : "#FFFFFF",
+                }}
+              >
+                <Text style={{ fontFamily: F.b700, fontSize: 12, color: role === r ? C.tealText : C.sub }}>
+                  {r}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+          <PrimaryButton
+            label={busy ? (fil ? "Ginagawa…" : "Creating…") : fil ? "Gumawa ng invite" : "Create invite"}
+            onPress={() => void create()}
+            height={42}
+            disabled={busy}
+          />
+        </View>
+      ) : (
+        <PressableScale scaleTo={0.98} onPress={() => setPicking(true)}>
+          <View
+            style={{
+              height: 42,
+              borderRadius: 12,
+              borderWidth: 1.5,
+              borderColor: C.teal,
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <Text style={{ fontFamily: F.b700, fontSize: 13, color: C.tealText }}>
+              {shown
+                ? fil
+                  ? "+ Isa pang invite"
+                  : "+ Another invite"
+                : fil
+                  ? "I-invite ang guardian ko"
+                  : "Invite my guardian"}
+            </Text>
+          </View>
+        </PressableScale>
+      )}
+    </Card>
+  );
+}
 
 function StudentInner() {
   const st = useUlat();
@@ -390,6 +545,31 @@ function StudentInner() {
               {first}
             </Text>
           </Card>
+          {(st.sLive ?? []).some((r) => r.guardianNudge) &&
+            (st.sGuardians?.guardians.length ?? 0) === 0 && (
+              <PressableScale scaleTo={0.985} onPress={() => st.set({ ptabS: "me" })}>
+                <View
+                  style={{
+                    backgroundColor: C.amberTint,
+                    borderRadius: 16,
+                    paddingHorizontal: 16,
+                    paddingVertical: 13,
+                    gap: 3,
+                  }}
+                >
+                  <Text style={{ fontFamily: F.d800, fontSize: 14, color: C.amberText }}>
+                    {fil
+                      ? "Hiling ng instructor mo: mag-invite ng guardian"
+                      : "Your instructor asks you to invite a guardian"}
+                  </Text>
+                  <Text style={{ fontFamily: F.b400, fontSize: 13, color: C.ink, lineHeight: 19 }}>
+                    {fil
+                      ? "Isang tap sa Me tab — makikita nila ang standing at attendance mo."
+                      : "One tap in the Me tab — they'll follow your standing and attendance."}
+                  </Text>
+                </View>
+              </PressableScale>
+            )}
           <PressableScale scaleTo={0.985} onPress={() => st.set({ ptabS: "classes", sClsCode: sFocus.code })}>
             <Card style={{ gap: 12 }}>
               <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
@@ -779,7 +959,14 @@ function StudentInner() {
               [
                 ["Student no.", main?.no || "—"],
                 ["Section", main?.section || "—"],
-                ...(isDemo ? ([["Guardian", "Lorna Reyes · Mother"]] as [string, string][]) : []),
+                ...(st.sGuardians?.guardians[0]
+                  ? ([
+                      [
+                        "Guardian",
+                        st.sGuardians.guardians[0].name + " · " + st.sGuardians.guardians[0].role,
+                      ],
+                    ] as [string, string][])
+                  : []),
                 ["Sharing", "Set by class · " + share.filter((r) => r.v === "Shared").length + " of 4 scopes"],
               ] as [string, string][]
             ).map(([k, v], i, arr) => (
@@ -799,6 +986,7 @@ function StudentInner() {
               </View>
             ))}
           </Card>
+          <GuardiansCard fil={fil} />
           <Card style={{ gap: 10 }}>
             <SectionTitle>Shared with your guardian</SectionTitle>
             <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
