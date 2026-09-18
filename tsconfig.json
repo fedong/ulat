@@ -19,7 +19,8 @@
       }
     ],
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@ulat/grade-math": ["./packages/grade-math/src"]
     }
   },
   "include": [

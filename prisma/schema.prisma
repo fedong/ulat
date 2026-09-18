@@ -1,0 +1,162 @@
+// Ulat — Phase 1 schema. Classes keep their grading system, guardian policy
+// and consultation config as JSON mirroring the @ulat/grade-math types, so
+// API payloads round-trip into the exact Klass shape both clients consume.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  INSTRUCTOR
+  STUDENT
+  GUARDIAN
+}
+
+enum EntState {
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  GRACE
+  FREE
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String?
+  googleSub    String?  @unique
+  role         Role     @default(INSTRUCTOR)
+  /// ProfileState: title, first, last, suffix, nameStyle, school, department,
+  /// position, facultyId, license, mobile, office, lang, notif prefs.
+  profile      Json     @default("{}")
+
+  // Entitlement per the payments spec (§ /v1/auth/me).
+  entState  EntState  @default(TRIALING)
+  entUntil  DateTime?
+  entMethod String? // Card | Maya | GCash
+  entCycle  String? // Monthly | Annual
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  classes       Class[]
+  refreshTokens RefreshToken[]
+}
+
+model RefreshToken {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
+  expiresAt DateTime
+  createdAt DateTime  @default(now())
+  revokedAt DateTime?
+
+  @@index([userId])
+}
+
+model Class {
+  id       String  @id @default(cuid())
+  ownerId  String
+  owner    User    @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  code     String
+  title    String
+  section  String
+  term     String
+  schedule String  @default("")
+  joinCode String  @unique
+  periods  String[]
+  /// { [period]: true } for periods marked Final.
+  closed   Json    @default("{}")
+  /// Grading from @ulat/grade-math: scale, passing, riskBand, groups, table,
+  /// transmute, termMethod, periodWeights.
+  grading  Json
+  /// Class sharing policy: { Grades, Attendance, "Missing work", Remarks }.
+  guardianScopes Json @default("{\"Grades\":true,\"Attendance\":true,\"Missing work\":true,\"Remarks\":false}")
+  /// { slots: [{id,days,start,end,where}], note }
+  consult  Json    @default("{\"slots\":[],\"note\":\"\"}")
+  archived Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  students    StudentRow[]
+  assessments Assessment[]
+  sessions    AttSession[]
+
+  @@index([ownerId])
+}
+
+model StudentRow {
+  id      String @id @default(cuid())
+  classId String
+  class   Class  @relation(fields: [classId], references: [id], onDelete: Cascade)
+  no      String
+  name    String
+  last    String
+  first   String
+  mi      String @default("")
+
+  flagged     Boolean   @default(false)
+  consultedAt DateTime?
+  remark      String    @default("")
+  /// [{ text, at }] — remark history, newest last.
+  remarkLog   Json      @default("[]")
+  /// Soft removal: scores and marks stay in the data but the student is no
+  /// longer counted or shown; re-adding by the same student number restores.
+  removedAt   DateTime?
+
+  scores Score[]
+
+  @@index([classId])
+}
+
+model Assessment {
+  id      String @id @default(cuid())
+  classId String
+  class   Class  @relation(fields: [classId], references: [id], onDelete: Cascade)
+  name    String
+  /// Component id within the class's grading JSON.
+  comp    String
+  period  String
+  max     Float
+  /// ISO date (yyyy-mm-dd), matching the grade engine's string dates.
+  date    String
+  notes   String @default("")
+  archivedAt DateTime?
+
+  scores Score[]
+
+  @@index([classId, period])
+}
+
+model Score {
+  studentRowId String
+  student      StudentRow @relation(fields: [studentRowId], references: [id], onDelete: Cascade)
+  assessmentId String
+  assessment   Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  /// Numeric string ("12.5"), "MISSED", or "EXC". Absence of a row = ungraded.
+  value        String
+  updatedAt    DateTime   @updatedAt
+
+  @@id([studentRowId, assessmentId])
+}
+
+model AttSession {
+  id      String @id @default(cuid())
+  classId String
+  class   Class  @relation(fields: [classId], references: [id], onDelete: Cascade)
+  date    String
+  /// Grading group id for split (Lecture/Lab) sessions; "" = whole class.
+  groupId String @default("")
+  /// { [studentRowId]: "P"|"L"|"A"|"E" }
+  marks   Json   @default("{}")
+
+  @@unique([classId, date, groupId])
+  @@index([classId])
+}
