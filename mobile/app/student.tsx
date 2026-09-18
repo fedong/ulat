@@ -24,7 +24,16 @@ import { OTHER_CLASSES, type StaticClass, type UpcomingItem } from "@/demo";
 import { currentPeriodOf } from "@/live";
 import { useUlat, type STab } from "@/store";
 import { C, F } from "@/theme";
-import { Card, Chip, PhoneShell, SectionTitle, TabBar, UpcomingRow, type TabDef } from "@/ui";
+import {
+  Card,
+  Chip,
+  PhoneShell,
+  PressableScale,
+  SectionTitle,
+  TabBar,
+  UpcomingRow,
+  type TabDef,
+} from "@/ui";
 
 const SEG_COLORS = ["#0FA3A0", "#5BBFBD", "#9AD9D7", "#C9ECEB"];
 
@@ -212,6 +221,7 @@ export default function StudentScreen() {
     <PhoneShell
       title={title}
       sub={sub}
+      screenKey={st.ptabS + ":" + sCls.code + ":" + sFocus.code}
       tabBar={<TabBar tabs={tabs} active={st.ptabS} onPick={(k) => st.set({ ptabS: k })} />}
     >
       {/* ============ HOME ============ */}
@@ -223,7 +233,7 @@ export default function StudentScreen() {
               {first}
             </Text>
           </Card>
-          <Pressable onPress={() => st.set({ ptabS: "classes", sClsCode: sFocus.code })}>
+          <PressableScale scaleTo={0.985} onPress={() => st.set({ ptabS: "classes", sClsCode: sFocus.code })}>
             <Card style={{ gap: 12 }}>
               <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
                 <View style={{ minWidth: 0, flexShrink: 1 }}>
@@ -263,12 +273,17 @@ export default function StudentScreen() {
                 </View>
               )}
             </Card>
-          </Pressable>
+          </PressableScale>
           <View style={{ flexDirection: "row", gap: 8 }}>
             {sAll
               .filter((x) => x.code !== sFocus.code)
               .map((x) => (
-                <Pressable key={x.code} style={{ flex: 1 }} onPress={() => st.set({ sFocusCode: x.code })}>
+                <PressableScale
+                  key={x.code}
+                  scaleTo={0.96}
+                  style={{ flex: 1 }}
+                  onPress={() => st.set({ sFocusCode: x.code })}
+                >
                   <Card style={{ borderRadius: 16, paddingHorizontal: 14, paddingVertical: 12, gap: 2 }}>
                     <Text style={{ fontFamily: F.b700, fontSize: 12, color: C.sub }}>{x.code}</Text>
                     <Text style={{ fontFamily: F.d900, fontSize: 22, lineHeight: 25, color: x.color }}>
@@ -278,7 +293,7 @@ export default function StudentScreen() {
                       Attendance {x.att}
                     </Text>
                   </Card>
-                </Pressable>
+                </PressableScale>
               ))}
           </View>
           {sUpcoming.length > 0 && (

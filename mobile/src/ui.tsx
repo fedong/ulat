@@ -1,17 +1,86 @@
-import React from "react";
+import React, { useEffect, useRef } from "react";
 import {
+  Animated,
+  Easing,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View,
+  type PressableProps,
   type StyleProp,
   type ViewStyle,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { StatusBar } from "expo-status-bar";
+import { LinearGradient } from "expo-linear-gradient";
 import Svg, { Circle, Path, Rect } from "react-native-svg";
+import { ContentBg } from "./brand";
 import { C, F, cardShadow } from "./theme";
 import type { UpcomingItem } from "./demo";
+
+/* ---------- press feedback (web: button:active scale) ---------- */
+
+export function PressableScale({
+  children,
+  style,
+  scaleTo = 0.98,
+  ...rest
+}: PressableProps & { children: React.ReactNode; style?: StyleProp<ViewStyle>; scaleTo?: number }) {
+  const v = useRef(new Animated.Value(1)).current;
+  return (
+    <Pressable
+      {...rest}
+      style={style}
+      onPressIn={(e) => {
+        Animated.spring(v, { toValue: scaleTo, friction: 6, tension: 200, useNativeDriver: true }).start();
+        rest.onPressIn?.(e);
+      }}
+      onPressOut={(e) => {
+        Animated.spring(v, { toValue: 1, friction: 6, tension: 200, useNativeDriver: true }).start();
+        rest.onPressOut?.(e);
+      }}
+    >
+      <Animated.View style={{ width: "100%", transform: [{ scale: v }] }}>{children}</Animated.View>
+    </Pressable>
+  );
+}
+
+/* ---------- entrance animation (web: ulatIn) ---------- */
+
+export function FadeInView({
+  children,
+  delay = 0,
+  style,
+}: {
+  children: React.ReactNode;
+  delay?: number;
+  style?: StyleProp<ViewStyle>;
+}) {
+  const v = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.timing(v, {
+      toValue: 1,
+      duration: 320,
+      delay,
+      easing: Easing.out(Easing.ease),
+      useNativeDriver: true,
+    }).start();
+  }, [v, delay]);
+  return (
+    <Animated.View
+      style={[
+        style,
+        {
+          opacity: v,
+          transform: [{ translateY: v.interpolate({ inputRange: [0, 1], outputRange: [8, 0] }) }],
+        },
+      ]}
+    >
+      {children}
+    </Animated.View>
+  );
+}
 
 /* ---------- icons (24px stroke SVGs, 1.8 stroke, round caps) ---------- */
 
@@ -110,8 +179,9 @@ export function TabBar<K extends string>({
   );
 }
 
-/* ---------- cards, chips, headers ---------- */
+/* ---------- cards, buttons, chips, headers ---------- */
 
+/** v3 card: soft white gradient fill, hairline border, two-stage shadow. */
 export function Card({
   children,
   style,
@@ -121,7 +191,66 @@ export function Card({
   style?: StyleProp<ViewStyle>;
   pad?: boolean;
 }) {
-  return <View style={[s.card, pad && s.cardPad, style]}>{children}</View>;
+  const { borderRadius = 20, ...rest } = StyleSheet.flatten(style) || {};
+  return (
+    <View style={[s.card, { borderRadius }]}>
+      <LinearGradient colors={["#FFFFFF", "#FDFCFA"]} style={StyleSheet.absoluteFill} />
+      <View style={[pad && s.cardPad, rest]}>{children}</View>
+    </View>
+  );
+}
+
+/** Primary CTA: the v3 teal gradient with an inner highlight and glow. */
+export function PrimaryButton({
+  label,
+  onPress,
+  disabled = false,
+  height = 48,
+  style,
+}: {
+  label: string;
+  onPress: () => void;
+  disabled?: boolean;
+  height?: number;
+  style?: StyleProp<ViewStyle>;
+}) {
+  return (
+    <PressableScale onPress={disabled ? undefined : onPress} scaleTo={0.985} style={style}>
+      <View
+        style={[
+          { height, borderRadius: 14, overflow: "hidden" },
+          !disabled && s.primaryGlow,
+          disabled && { backgroundColor: C.disabled },
+        ]}
+      >
+        {!disabled && (
+          <LinearGradient
+            colors={["#17B5B1", "#0FA3A0", "#0B8F8C"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={StyleSheet.absoluteFill}
+          />
+        )}
+        {!disabled && (
+          <View
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              right: 0,
+              height: 1.5,
+              backgroundColor: "rgba(255,255,255,0.28)",
+            }}
+          />
+        )}
+        <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+          <Text numberOfLines={1} style={{ fontFamily: F.b700, fontSize: height >= 48 ? 15 : 14, color: "#FFFFFF" }}>
+            {label}
+          </Text>
+        </View>
+      </View>
+    </PressableScale>
+  );
 }
 
 export function Chip({ text, bg, color }: { text: string; bg: string; color: string }) {
@@ -138,21 +267,38 @@ export function SectionTitle({ children }: { children: React.ReactNode }) {
 
 export function BackPill({ label, onPress }: { label: string; onPress: () => void }) {
   return (
-    <Pressable onPress={onPress} style={s.backPill}>
-      <Text style={s.backChevron}>‹</Text>
-      <Text style={s.backLabel}>{label}</Text>
-    </Pressable>
+    <PressableScale onPress={onPress} scaleTo={0.96} style={{ alignSelf: "flex-start" }}>
+      <View style={s.backPill}>
+        <Text style={s.backChevron}>‹</Text>
+        <Text style={s.backLabel}>{label}</Text>
+      </View>
+    </PressableScale>
   );
 }
 
 export function Toast({ text }: { text: string }) {
+  const v = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.spring(v, { toValue: 1, friction: 6, tension: 120, useNativeDriver: true }).start();
+  }, [v, text]);
   return (
-    <View style={s.toast}>
+    <Animated.View
+      style={[
+        s.toast,
+        {
+          opacity: v,
+          transform: [
+            { translateY: v.interpolate({ inputRange: [0, 1], outputRange: [10, 0] }) },
+            { scale: v.interpolate({ inputRange: [0, 1], outputRange: [0.92, 1] }) },
+          ],
+        },
+      ]}
+    >
       <View style={s.toastDot}>
         <Text style={{ fontFamily: F.d800, fontSize: 12, color: "#FFFFFF" }}>✓</Text>
       </View>
       <Text style={s.toastText}>{text}</Text>
-    </View>
+    </Animated.View>
   );
 }
 
@@ -196,30 +342,37 @@ export function PhoneShell({
   children,
   tabBar,
   toast,
+  screenKey,
 }: {
   title: string;
   sub: string;
   children: React.ReactNode;
   tabBar: React.ReactNode;
   toast?: string | null;
+  /** Changing this key replays the content entrance (tab switches). */
+  screenKey?: string;
 }) {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: C.canvas }} edges={["top", "left", "right"]}>
+      <StatusBar style="dark" />
+      <ContentBg />
       <ScrollView
         style={{ flex: 1 }}
-        contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 10, paddingBottom: 20, gap: 14 }}
+        contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 10, paddingBottom: 20 }}
         showsVerticalScrollIndicator={false}
       >
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
-          <View style={{ minWidth: 0 }}>
-            <Text style={{ fontFamily: F.d800, fontSize: 20, letterSpacing: -0.3, color: C.ink }}>
-              {title}
-            </Text>
-            <Text style={{ fontFamily: F.b500, fontSize: 13, color: C.sub }}>{sub}</Text>
+        <FadeInView key={screenKey} style={{ gap: 14 }}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+            <View style={{ minWidth: 0 }}>
+              <Text style={{ fontFamily: F.d800, fontSize: 20, letterSpacing: -0.3, color: C.ink }}>
+                {title}
+              </Text>
+              <Text style={{ fontFamily: F.b500, fontSize: 13, color: C.sub }}>{sub}</Text>
+            </View>
           </View>
-        </View>
-        {!!toast && <Toast text={toast} />}
-        {children}
+          {!!toast && <Toast text={toast} />}
+          {children}
+        </FadeInView>
       </ScrollView>
       {tabBar}
     </SafeAreaView>
@@ -259,13 +412,21 @@ const s = StyleSheet.create({
     borderColor: "#FFFFFF",
   },
   card: {
-    backgroundColor: C.card,
     borderRadius: 20,
     borderWidth: 1,
     borderColor: "rgba(34,48,60,0.06)",
+    overflow: "hidden",
+    backgroundColor: "#FFFFFF",
     ...cardShadow,
   },
   cardPad: { paddingHorizontal: 18, paddingVertical: 16 },
+  primaryGlow: {
+    shadowColor: "#0FA3A0",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.45,
+    shadowRadius: 12,
+    elevation: 5,
+  },
   chip: {
     alignSelf: "flex-start",
     paddingHorizontal: 9,
@@ -275,7 +436,6 @@ const s = StyleSheet.create({
   chipText: { fontFamily: F.b700, fontSize: 11 },
   sectionTitle: { fontFamily: F.d800, fontSize: 15, color: C.ink },
   backPill: {
-    alignSelf: "flex-start",
     height: 32,
     paddingLeft: 8,
     paddingRight: 12,

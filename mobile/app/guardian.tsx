@@ -6,7 +6,17 @@ import { DEMO_GUARDIAN, KLABEL, MIGUEL_CLASSES, OTHER_CLASSES, type StaticClass 
 import { buildLive, type StripTile } from "@/live";
 import { useUlat, type GTab } from "@/store";
 import { C, F } from "@/theme";
-import { BackPill, Card, Chip, PhoneShell, SectionTitle, TabBar, UpcomingRow, type TabDef } from "@/ui";
+import {
+  BackPill,
+  Card,
+  Chip,
+  PhoneShell,
+  PressableScale,
+  SectionTitle,
+  TabBar,
+  UpcomingRow,
+  type TabDef,
+} from "@/ui";
 
 interface Kid {
   name: string;
@@ -189,6 +199,7 @@ export default function GuardianScreen() {
     <PhoneShell
       title={title}
       sub={sub}
+      screenKey={st.ptabG + ":" + String(st.gChild) + ":" + String(st.gCls)}
       tabBar={<TabBar tabs={tabs} active={st.ptabG} onPick={(k) => st.set({ ptabG: k })} />}
     >
       {/* ============ HOME ============ */}
@@ -267,7 +278,7 @@ export default function GuardianScreen() {
         <>
           <BackPill label="Children" onPress={() => st.set({ gChild: null, gCls: null })} />
           {gKid.classes.map((x) => (
-            <Pressable key={x.code} onPress={() => st.set({ gCls: x.code })}>
+            <PressableScale key={x.code} scaleTo={0.98} onPress={() => st.set({ gCls: x.code })}>
               <Card style={{ gap: 12 }}>
                 <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
                   <View style={{ minWidth: 0, flexShrink: 1 }}>
@@ -288,7 +299,7 @@ export default function GuardianScreen() {
                   {x.status === "Active" ? x.scopes.length + " of 4 scopes shared" : x.status}
                 </Text>
               </Card>
-            </Pressable>
+            </PressableScale>
           ))}
         </>
       )}

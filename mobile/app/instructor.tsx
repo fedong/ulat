@@ -1,6 +1,7 @@
-import React, { useMemo, useRef } from "react";
+import React, { useEffect, useMemo, useRef } from "react";
 import { router } from "expo-router";
 import {
+  Animated,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -8,6 +9,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import type { Assessment, AttMark, Klass, Score, Session } from "@ulat/grade-math";
 import {
   ATT_COLORS,
@@ -27,10 +29,59 @@ import {
 } from "@/derive";
 import { useUlat, type ITab } from "@/store";
 import { C, F, selectedShadow } from "@/theme";
-import { BackPill, Card, Chip, PhoneShell, SectionTitle, TabBar, type TabDef } from "@/ui";
+import {
+  BackPill,
+  Card,
+  Chip,
+  PhoneShell,
+  PressableScale,
+  PrimaryButton,
+  SectionTitle,
+  TabBar,
+  type TabDef,
+} from "@/ui";
 
 const CARD_W = 260;
 const CARD_GAP = 10;
+
+/** Carousel class card: scale/opacity spring to the selected state (web: 0.25s ease). */
+function ClassCard({
+  on,
+  children,
+  onPress,
+}: {
+  on: boolean;
+  children: React.ReactNode;
+  onPress: () => void;
+}) {
+  const v = useRef(new Animated.Value(on ? 1 : 0)).current;
+  useEffect(() => {
+    Animated.spring(v, { toValue: on ? 1 : 0, friction: 8, tension: 80, useNativeDriver: true }).start();
+  }, [on, v]);
+  return (
+    <Pressable onPress={onPress}>
+      <Animated.View
+        style={[
+          {
+            width: CARD_W,
+            paddingHorizontal: 16,
+            paddingVertical: 14,
+            borderRadius: 16,
+            borderWidth: 1.5,
+            gap: 1,
+            borderColor: on ? C.teal : C.line,
+            backgroundColor: on ? C.tealTint10 : "#FFFFFF",
+            opacity: v.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1] }),
+            transform: [{ scale: v.interpolate({ inputRange: [0, 1], outputRange: [0.88, 1] }) }],
+          },
+          on && selectedShadow,
+        ]}
+      >
+        {children}
+      </Animated.View>
+    </Pressable>
+  );
+}
 
 const asmGroup = (cls: Klass, compId: string) => {
   const r = compById(cls.grading, compId);
@@ -273,6 +324,7 @@ export default function InstructorScreen() {
       title={title}
       sub={sub}
       toast={st.phoneToast}
+      screenKey={st.ptabI + (pa ? ":" + pa.id : "")}
       tabBar={<TabBar tabs={tabs} active={st.ptabI} onPick={(k) => st.set({ ptabI: k })} />}
     >
       {/* ============ CLASSES + NEW ASSESSMENT ============ */}
@@ -300,20 +352,7 @@ export default function InstructorScreen() {
                 const on = c.id === cls.id;
                 const team = (c.team || []).filter((m) => m.status === "active");
                 return (
-                  <Pressable
-                    key={c.id}
-                    onPress={() => pickCls(c, i)}
-                    style={[
-                      s.clsCard,
-                      {
-                        borderColor: on ? C.teal : C.line,
-                        backgroundColor: on ? C.tealTint10 : "#FFFFFF",
-                        transform: [{ scale: on ? 1 : 0.88 }],
-                        opacity: on ? 1 : 0.6,
-                      },
-                      on && selectedShadow,
-                    ]}
-                  >
+                  <ClassCard key={c.id} on={on} onPress={() => pickCls(c, i)}>
                     <Text numberOfLines={1} style={{ fontFamily: F.d800, fontSize: 15, color: C.ink }}>
                       {c.code} · {c.section}
                     </Text>
@@ -321,7 +360,7 @@ export default function InstructorScreen() {
                       {c.title} · {c.roster.length} students
                       {team.length ? " · with " + team.map((m) => honor(m.name)).join(", ") : ""}
                     </Text>
-                  </Pressable>
+                  </ClassCard>
                 );
               })}
             </ScrollView>
@@ -460,18 +499,7 @@ export default function InstructorScreen() {
                 </Text>
               </View>
             )}
-            <Pressable
-              onPress={createNa}
-              style={{
-                height: 48,
-                borderRadius: 14,
-                alignItems: "center",
-                justifyContent: "center",
-                backgroundColor: naOk ? C.teal : C.disabled,
-              }}
-            >
-              <Text style={{ fontFamily: F.b700, fontSize: 15, color: "#FFFFFF" }}>Add assessment</Text>
-            </Pressable>
+            <PrimaryButton label="Add assessment" onPress={createNa} disabled={!naOk} />
             <Text style={{ fontFamily: F.b400, fontSize: 12, color: C.sub, lineHeight: 18 }}>
               Leave blank to name it &quot;{naSuggest}&quot;. Components come from the grading system set
               on the web.
@@ -665,29 +693,34 @@ export default function InstructorScreen() {
                 const open = cls.sessions.some(
                   (x) => x.date === todayIso() && (x.group || null) === gid,
                 );
-                return (
-                  <Pressable
+                return open ? (
+                  <PressableScale
                     key={String(gid)}
                     onPress={() => startToday(gid)}
-                    style={{
-                      flex: 1,
-                      height: 48,
-                      borderRadius: 14,
-                      alignItems: "center",
-                      justifyContent: "center",
-                      backgroundColor: open ? C.disabled : C.teal,
-                    }}
+                    scaleTo={0.985}
+                    style={{ flex: 1 }}
                   >
-                    <Text numberOfLines={1} style={{ fontFamily: F.b700, fontSize: 14, color: "#FFFFFF" }}>
-                      {open
-                        ? nm
-                          ? nm + " is open"
-                          : "Today is open"
-                        : nm
-                          ? "Start today · " + nm
-                          : "Start today's session"}
-                    </Text>
-                  </Pressable>
+                    <View
+                      style={{
+                        height: 48,
+                        borderRadius: 14,
+                        alignItems: "center",
+                        justifyContent: "center",
+                        backgroundColor: C.disabled,
+                      }}
+                    >
+                      <Text numberOfLines={1} style={{ fontFamily: F.b700, fontSize: 14, color: "#FFFFFF" }}>
+                        {nm ? nm + " is open" : "Today is open"}
+                      </Text>
+                    </View>
+                  </PressableScale>
+                ) : (
+                  <PrimaryButton
+                    key={String(gid)}
+                    label={nm ? "Start today · " + nm : "Start today's session"}
+                    onPress={() => startToday(gid)}
+                    style={{ flex: 1 }}
+                  />
                 );
               },
             )}
@@ -879,7 +912,13 @@ export default function InstructorScreen() {
       {st.ptabI === "me" && (
         <>
           <Card style={{ alignItems: "center", paddingVertical: 24, gap: 6 }}>
-            <View style={s.avatar}>
+            <View style={[s.avatar, s.avatarGlow]}>
+              <LinearGradient
+                colors={["#17B5B1", "#0B8F8C"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={StyleSheet.absoluteFill}
+              />
               <Text style={{ fontFamily: F.d800, fontSize: 22, color: "#FFFFFF" }}>DR</Text>
             </View>
             <Text style={{ fontFamily: F.d800, fontSize: 18, color: C.ink }}>{DEMO_INSTRUCTOR.name}</Text>
@@ -930,14 +969,6 @@ const s = StyleSheet.create({
     backgroundColor: "#FFFFFF",
     borderWidth: 1,
     borderColor: C.line,
-  },
-  clsCard: {
-    width: CARD_W,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderRadius: 16,
-    borderWidth: 1.5,
-    gap: 1,
   },
   label: { fontFamily: F.b700, fontSize: 11, letterSpacing: 0.6, color: C.sub },
   input: {
@@ -1001,6 +1032,14 @@ const s = StyleSheet.create({
     backgroundColor: C.teal,
     alignItems: "center",
     justifyContent: "center",
+    overflow: "hidden",
+  },
+  avatarGlow: {
+    shadowColor: "#0FA3A0",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.5,
+    shadowRadius: 10,
+    elevation: 4,
   },
   signOut: {
     height: 44,
