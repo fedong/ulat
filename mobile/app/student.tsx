@@ -40,7 +40,7 @@ const SEG_COLORS = ["#0FA3A0", "#5BBFBD", "#9AD9D7", "#C9ECEB"];
 
 export default function StudentScreen() {
   const st = useUlat();
-  const cls = st.classes.find((c) => c.id === "cs101")!;
+  const cls = st.demoClasses.find((c) => c.id === "cs101")!;
   const gs = cls.grading;
   const sr = cls.roster.find((r) => r.id === st.studentId) || cls.roster[0];
   const first = firstNameOf(sr.name);

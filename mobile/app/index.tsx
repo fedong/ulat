@@ -68,7 +68,7 @@ export default function Onboarding() {
     {
       title: "I'm an instructor",
       sub: "Record scores and attendance on the go",
-      href: "/instructor",
+      href: "/signin",
       icon: "grades",
     },
     {
@@ -111,7 +111,7 @@ export default function Onboarding() {
           ))}
         </View>
         <FadeInView delay={700}>
-          <Text style={s.foot}>Sign in with Google or email on the next step · Demo build</Text>
+          <Text style={s.foot}>Instructors sign in with their Ulat account · Student and guardian demos</Text>
         </FadeInView>
       </SafeAreaView>
     </BrandBg>

@@ -20,15 +20,16 @@ import {
   attRate,
   compById,
   compute,
-  uid,
+  newId,
 } from "@ulat/grade-math";
 import {
   consultSummary,
-  DEMO_INSTRUCTOR,
   fmtDate,
   honor,
   todayIso,
 } from "@/derive";
+import { saveProfile } from "@/api";
+import { doSignOut } from "@/session";
 import { useUlat, type ITab } from "@/store";
 import { C, F, selectedShadow } from "@/theme";
 import {
@@ -116,7 +117,61 @@ const asmGroup = (cls: Klass, compId: string) => {
 const linked = (cls: Klass, s: Session, a: { date: string; comp: string }) =>
   a.date === s.date && (!s.group || asmGroup(cls, a.comp) === s.group);
 
+/** Route component: gate on session + classes so the inner hooks always have a class. */
 export default function InstructorScreen() {
+  const signedIn = useUlat((s) => s.signedIn);
+  const hasClasses = useUlat((s) => s.classes.length > 0);
+  const fil = useUlat((s) => s.lang === "Filipino");
+  useEffect(() => {
+    if (!signedIn) router.replace("/signin");
+  }, [signedIn]);
+  if (!signedIn) return null;
+  if (!hasClasses) return <NoClasses fil={fil} />;
+  return <InstructorInner />;
+}
+
+/** An account with no classes yet (they're created on the web). */
+function NoClasses({ fil }: { fil: boolean }) {
+  return (
+    <PhoneShell
+      title={fil ? "Mga klase" : "Classes"}
+      sub={fil ? "Walang klase" : "No classes yet"}
+      tabBar={null}
+    >
+      <Card style={{ gap: 8, alignItems: "center", paddingVertical: 28 }}>
+        <Text style={{ fontFamily: F.d800, fontSize: 17, color: C.ink }}>
+          {fil ? "Wala ka pang klase" : "No classes yet"}
+        </Text>
+        <Text
+          style={{
+            fontFamily: F.b400,
+            fontSize: 13,
+            color: C.sub,
+            textAlign: "center",
+            lineHeight: 19,
+          }}
+        >
+          {fil
+            ? "Gumawa ng klase sa Ulat web app — lalabas ito rito agad."
+            : "Create a class on the Ulat web app — it will appear here right away."}
+        </Text>
+        <PressableScale
+          scaleTo={0.97}
+          onPress={() => {
+            void doSignOut();
+            router.replace("/");
+          }}
+        >
+          <Text style={{ fontFamily: F.b700, fontSize: 13, color: C.tealText, padding: 8 }}>
+            {fil ? "Mag-sign out" : "Sign out"}
+          </Text>
+        </PressableScale>
+      </Card>
+    </PhoneShell>
+  );
+}
+
+function InstructorInner() {
   const st = useUlat();
   const cls = st.classes.find((c) => c.id === st.clsId) || st.classes[0];
   const gs = cls.grading;
@@ -162,7 +217,7 @@ export default function InstructorScreen() {
 
   const createNa = () => {
     if (!naOk) return;
-    const id = uid();
+    const id = newId();
     const nm = st.na.name.trim() || naSuggest;
     st.upCls(cls.id, (c) => {
       const ses = c.sessions.find((s) => linked(c, s, { date: st.na.date, comp: naComp }));
@@ -415,12 +470,39 @@ export default function InstructorScreen() {
   };
   const periodClosed = !!closedP[st.period];
 
-  /* ---- entitlement (demo: Trialing) ---- */
-  const trialDays = Math.max(0, Math.round((Date.parse("2027-02-14") - Date.now()) / 864e5));
-  const planTitle = fil
-    ? "Nasa Pro ka — libre hanggang February 14"
-    : "You're on Pro — free until February 14";
-  const planSub = fil ? trialDays + " araw pa" : trialDays + " days left";
+  /* ---- entitlement (live, from /v1/auth/me) ---- */
+  const ent = st.ent;
+  const entUntil = ent?.until ? new Date(ent.until + "T00:00:00") : null;
+  const untilText = entUntil
+    ? entUntil.toLocaleDateString("en-US", { month: "long", day: "numeric" })
+    : "";
+  const trialDays = entUntil
+    ? Math.max(0, Math.round((entUntil.getTime() - Date.now()) / 864e5))
+    : 0;
+  const planTitle =
+    ent?.state === "Trialing"
+      ? fil
+        ? "Nasa Pro ka — libre hanggang " + untilText
+        : "You're on Pro — free until " + untilText
+      : ent?.tier === "PRO"
+        ? fil
+          ? "Nasa Pro ka"
+          : "You're on Pro"
+        : fil
+          ? "Libreng plano — 2 aktibong klase"
+          : "Free plan — 2 active classes";
+  const planSub =
+    ent?.state === "Trialing"
+      ? fil
+        ? trialDays + " araw pa"
+        : trialDays + " days left"
+      : ent?.tier === "PRO" && untilText
+        ? fil
+          ? "hanggang " + untilText
+          : "until " + untilText
+        : fil
+          ? "Mag-upgrade sa web"
+          : "Upgrade on the web";
 
   return (
     <PhoneShell
@@ -1056,11 +1138,13 @@ export default function InstructorScreen() {
                 end={{ x: 1, y: 1 }}
                 style={StyleSheet.absoluteFill}
               />
-              <Text style={{ fontFamily: F.d800, fontSize: 22, color: "#FFFFFF" }}>DR</Text>
+              <Text style={{ fontFamily: F.d800, fontSize: 22, color: "#FFFFFF" }}>
+                {(st.meName.match(/\b([A-Z])/g) || ["U"]).slice(-2).join("")}
+              </Text>
             </View>
-            <Text style={{ fontFamily: F.d800, fontSize: 18, color: C.ink }}>{DEMO_INSTRUCTOR.name}</Text>
+            <Text style={{ fontFamily: F.d800, fontSize: 18, color: C.ink }}>{st.meName}</Text>
             <Text style={{ fontFamily: F.b400, fontSize: 13, color: C.sub }}>
-              {DEMO_INSTRUCTOR.email} · {activeCls.length} {fil ? "klase" : "classes"}
+              {st.email} · {activeCls.length} {fil ? "klase" : "classes"}
             </Text>
           </Card>
           <Card style={{ gap: 8 }}>
@@ -1078,14 +1162,27 @@ export default function InstructorScreen() {
               {(["English", "Filipino"] as const).map((l) => {
                 const on = st.lang === l;
                 return (
-                  <Pressable key={l} onPress={() => st.set({ lang: l })} style={[s.segBtn, on && s.segBtnOn]}>
+                  <Pressable
+                    key={l}
+                    onPress={() => {
+                      st.set({ lang: l });
+                      saveProfile({ lang: l }).catch(() => {});
+                    }}
+                    style={[s.segBtn, on && s.segBtnOn]}
+                  >
                     <Text style={{ fontFamily: F.b700, fontSize: 12, color: on ? "#FFFFFF" : C.sub }}>{l}</Text>
                   </Pressable>
                 );
               })}
             </View>
           </Card>
-          <PressableScale scaleTo={0.98} onPress={() => router.back()}>
+          <PressableScale
+            scaleTo={0.98}
+            onPress={() => {
+              void doSignOut();
+              router.replace("/");
+            }}
+          >
             <View style={s.signOut}>
               <Text style={{ fontFamily: F.b700, fontSize: 13, color: C.redText }}>
                 {fil ? "Mag-sign out" : "Sign out"}

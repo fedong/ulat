@@ -48,9 +48,13 @@ npm install
 npx expo start        # scan the QR with Expo Go, or press w for the browser
 ```
 
-The splash screen picks the role: Instructor (4b) records scores and
-attendance on the go, Student (4c) is seeded as Ana Reyes across three
-classes, Guardian (4d) is Mrs. Reyes following Ana and Miguel.
+The splash screen picks the role: Instructor (4b) signs in with a real Ulat
+account (or tours the seeded demo) and works on live API data — scores,
+attendance and settings sync optimistically to the cloud. Student (4c) and
+Guardian (4d) remain seeded showcases (Ana Reyes / Mrs. Reyes) until their
+roles get accounts. Point `EXPO_PUBLIC_API_URL` at the API server (your
+machine's LAN IP when testing on a device); it defaults to
+`http://localhost:3100`.
 
 API (the web client runs on it; mobile wiring is next):
 
@@ -62,6 +66,7 @@ npx prisma db seed            # demo instructor + CS101/MTEC305A
 npm run dev                   # API lives beside the web app under /api/v1
 npm run api:test              # HTTP-level test against a running server
 node scripts/web-e2e.mjs      # browser E2E (Playwright): sign-in, writes, persistence
+node scripts/mobile-e2e.mjs   # browser E2E for the mobile web export (see its header)
 ```
 
 Demo account: `d.rivera@univ.edu.ph` / `ulat-demo-2026` (Pro trial).
@@ -148,4 +153,17 @@ payments land). Covered by `npm run api:test` (63 HTTP checks) and
 `scripts/web-e2e.mjs` (browser: sign-in, persistence across reloads, wizard
 class creation on a fresh account).
 
-Next milestone: wire the mobile app to the API, then sharing/guardian invites.
+Phase 3: the mobile instructor role runs on the API too. The role splash
+routes instructors through a branded sign-in (with session restore from
+AsyncStorage and a demo-account tour button); classes, identity and the plan
+banner hydrate from `/v1`, and every edit goes through the same shared diff
+engine (`packages/grade-math/src/apiops.ts`, extracted from the web sync so
+both clients literally run one implementation) on a retrying queue — a save
+that ultimately fails raises a toast and keeps your on-screen state. Accounts
+with no classes get a friendly empty state; student/guardian showcases keep
+their own fixed demo data. The API gained permissive CORS on `/api/v1` for
+the mobile web build. Covered by `scripts/mobile-e2e.mjs` (browser over the
+Expo web export: sign-in, live classes, attendance session started, persisted
+across reload + session restore, discarded, and the demo roles intact).
+
+Next milestone: student/guardian accounts + sharing and guardian invites.

@@ -9,3 +9,4 @@ export * from "./types";
 export * from "./grading";
 export * from "./presets";
 export * from "./seed";
+export * from "./apiops";

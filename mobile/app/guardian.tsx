@@ -28,7 +28,7 @@ interface Kid {
 
 export default function GuardianScreen() {
   const st = useUlat();
-  const cls = st.classes.find((c) => c.id === "cs101")!;
+  const cls = st.demoClasses.find((c) => c.id === "cs101")!;
   const sr = cls.roster.find((r) => r.id === st.studentId) || cls.roster[0];
   const fil = st.lang === "Filipino";
 
