@@ -255,12 +255,10 @@ export default function InstructorScreen() {
     const nm = gid ? gName(gid) : "";
     const idx = cls.sessions.findIndex((s) => s.date === todayIso() && (s.group || null) === gid);
     if (idx >= 0) {
-      // Already open: jump to it and say so, so the tap never feels dead.
+      // Session is open: the button reads "Save today's session" — confirm
+      // the recorded marks and jump to today's chip.
       st.set({ phoneSession: idx });
-      st.toast(
-        (nm ? "Today's " + nm + " session" : "Today's session") +
-          " is already open — you're viewing it below.",
-      );
+      st.toast("Attendance saved · students and guardians see it now.");
       return;
     }
     st.upCls(cls.id, (c) => ({
@@ -790,34 +788,26 @@ export default function InstructorScreen() {
       {/* ============ ATTENDANCE ============ */}
       {st.ptabI === "attend" && (
         <>
-          {/* One full-width button per group — stacked, so "Start today ·
-              Laboratory" never fights for half a row. */}
+          {/* One full-width button per group. Once a session is open the same
+              button becomes the save action for today's marks. */}
           <View style={{ gap: 8 }}>
             {(multiGroup ? gs.groups.map((g) => [g.id, g.name] as const) : [[null, ""] as const]).map(
               ([gid, nm]) => {
                 const open = cls.sessions.some(
                   (x) => x.date === todayIso() && (x.group || null) === gid,
                 );
-                return open ? (
-                  <PressableScale key={String(gid)} onPress={() => startToday(gid)} scaleTo={0.985}>
-                    <View
-                      style={{
-                        height: 48,
-                        borderRadius: 14,
-                        alignItems: "center",
-                        justifyContent: "center",
-                        backgroundColor: C.disabled,
-                      }}
-                    >
-                      <Text numberOfLines={1} style={{ fontFamily: F.b700, fontSize: 14, color: "#FFFFFF" }}>
-                        {nm ? "Today's " + nm + " session is open" : "Today's session is open"}
-                      </Text>
-                    </View>
-                  </PressableScale>
-                ) : (
+                return (
                   <PrimaryButton
                     key={String(gid)}
-                    label={nm ? "Start today's " + nm + " session" : "Start today's session"}
+                    label={
+                      open
+                        ? nm
+                          ? "Save today's " + nm + " session"
+                          : "Save today's session"
+                        : nm
+                          ? "Start today's " + nm + " session"
+                          : "Start today's session"
+                    }
                     onPress={() => startToday(gid)}
                   />
                 );

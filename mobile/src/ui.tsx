@@ -309,20 +309,34 @@ export function BackPill({ label, onPress }: { label: string; onPress: () => voi
   );
 }
 
-export function Toast({ text }: { text: string }) {
+/**
+ * Floating toast: hovers above the tab bar, springs in, fades out. It never
+ * takes part in the layout, so content doesn't jump when it appears.
+ */
+export function Toast({ text }: { text: string | null }) {
+  const [shown, setShown] = useState<string | null>(null);
   const v = useRef(new Animated.Value(0)).current;
   useEffect(() => {
-    Animated.spring(v, { toValue: 1, friction: 6, tension: 120, useNativeDriver: true }).start();
-  }, [v, text]);
+    if (text) {
+      setShown(text);
+      Animated.spring(v, { toValue: 1, friction: 6, tension: 120, useNativeDriver: true }).start();
+    } else {
+      Animated.timing(v, { toValue: 0, duration: 220, useNativeDriver: true }).start(
+        ({ finished }) => finished && setShown(null),
+      );
+    }
+  }, [text, v]);
+  if (!shown) return null;
   return (
     <Animated.View
+      pointerEvents="none"
       style={[
         s.toast,
         {
           opacity: v,
           transform: [
-            { translateY: v.interpolate({ inputRange: [0, 1], outputRange: [10, 0] }) },
-            { scale: v.interpolate({ inputRange: [0, 1], outputRange: [0.92, 1] }) },
+            { translateY: v.interpolate({ inputRange: [0, 1], outputRange: [14, 0] }) },
+            { scale: v.interpolate({ inputRange: [0, 1], outputRange: [0.94, 1] }) },
           ],
         },
       ]}
@@ -330,7 +344,7 @@ export function Toast({ text }: { text: string }) {
       <View style={s.toastDot}>
         <Text style={{ fontFamily: F.d800, fontSize: 12, color: "#FFFFFF" }}>✓</Text>
       </View>
-      <Text style={s.toastText}>{text}</Text>
+      <Text style={s.toastText}>{shown}</Text>
     </Animated.View>
   );
 }
@@ -402,10 +416,10 @@ export function PhoneShell({
               <Text style={{ fontFamily: F.b500, fontSize: 13, color: C.sub }}>{sub}</Text>
             </View>
           </View>
-          {!!toast && <Toast text={toast} />}
           {children}
         </FadeInView>
       </ScrollView>
+      <Toast text={toast ?? null} />
       {tabBar}
     </SafeAreaView>
   );
@@ -491,6 +505,10 @@ const s = StyleSheet.create({
   backChevron: { fontSize: 16, lineHeight: 18, color: C.tealText },
   backLabel: { fontFamily: F.b700, fontSize: 12, color: C.tealText },
   toast: {
+    position: "absolute",
+    left: 20,
+    right: 20,
+    bottom: 100,
     backgroundColor: C.ink,
     borderRadius: 14,
     paddingHorizontal: 14,
@@ -498,6 +516,12 @@ const s = StyleSheet.create({
     flexDirection: "row",
     gap: 10,
     alignItems: "center",
+    shadowColor: "#101D26",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 8,
+    zIndex: 20,
   },
   toastDot: {
     width: 20,
