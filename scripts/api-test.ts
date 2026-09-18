@@ -328,6 +328,161 @@ async function main() {
   });
   ok(third.status === 403 && third.body.error === "free_limit", "third class hits free_limit");
 
+  console.log("student accounts + join code");
+  const joinCode: string = (await api("GET", `/api/v1/classes/${cid}`, { token })).body.class
+    .joinCode;
+  const stuReg = await api("POST", "/api/v1/auth/register", {
+    body: { email: `qa.stu.${stamp}@example.com`, password, role: "student", first: "Ana", last: "Alpha" },
+  });
+  ok(
+    stuReg.status === 201 && stuReg.body.user.role === "STUDENT",
+    "student account registers with the student role",
+  );
+  ok(stuReg.body.entitlement.state === "Free", "student accounts carry no trial");
+  const stuTok: string = stuReg.body.access;
+
+  const badJoin = await api("POST", "/api/v1/join", {
+    token: stuTok,
+    body: { code: "NOPE99", name: "Alpha, Ana" },
+  });
+  ok(badJoin.status === 404 && badJoin.body.error === "unknown_code", "wrong class code rejected");
+  const join = await api("POST", "/api/v1/join", {
+    token: stuTok,
+    body: { code: joinCode, name: "Alpha, Ana" },
+  });
+  ok(join.status === 201 && join.body.studentRowId === ana, "join matches the roster row by name");
+  const wrongRole = await api("GET", "/api/v1/student/classes", { token });
+  ok(wrongRole.status === 403, "instructor accounts cannot use the student view");
+
+  // Give the student something to see: an assessment, scores, a session, a remark.
+  const asm2 = await api("POST", `/api/v1/classes/${cid}/assessments`, {
+    token,
+    body: { name: "Quiz S", comp: compId, period: "Prelims", max: 20, date: "2026-09-21" },
+  });
+  const aid2: string = asm2.body.id;
+  await api("PUT", `/api/v1/classes/${cid}/scores`, {
+    token,
+    body: { studentRowId: ana, assessmentId: aid2, value: 12 },
+  });
+  await api("PUT", `/api/v1/classes/${cid}/scores`, {
+    token,
+    body: { studentRowId: ben, assessmentId: aid2, value: 18 },
+  });
+  await api("POST", `/api/v1/classes/${cid}/sessions`, { token, body: { date: "2026-09-21" } });
+  await api("PATCH", `/api/v1/classes/${cid}/sessions`, {
+    token,
+    body: { date: "2026-09-21", groupId: "", studentRowId: ana, mark: "L" },
+  });
+  await api("PATCH", `/api/v1/classes/${cid}/students`, {
+    token,
+    body: { studentRowId: ana, remark: "Doing better after consultation." },
+  });
+
+  const stuView = await api("GET", "/api/v1/student/classes", { token: stuTok });
+  const sv = stuView.body.classes[0];
+  ok(stuView.body.classes.length === 1 && sv.class.code === "QA101", "student sees the joined class");
+  ok(sv.class.joinCode === "", "join code never reaches students");
+  ok(
+    sv.class.roster.length === 1 &&
+      sv.class.scores[ana]?.[aid2] === 12 &&
+      sv.class.scores[ben] === undefined,
+    "student view holds only their own row and scores",
+  );
+  ok(
+    sv.class.sessions.some(
+      (s: { marks: Record<string, string> }) => s.marks[ana] === "L" && !(ben in s.marks),
+    ),
+    "attendance marks are filtered to the student",
+  );
+  ok(sv.class.remarks[ana] === "Doing better after consultation.", "students see their own remark");
+
+  console.log("guardian invites + scope gating");
+  const inv = await api("POST", `/api/v1/classes/${cid}/guardians`, {
+    token,
+    body: { studentRowId: ana, name: "Gina Alpha", contact: "0917 555 0100", role: "Mother" },
+  });
+  ok(inv.status === 201 && inv.body.code.length === 12, "guardian invite returns a claim code");
+  const sharing = await api("GET", `/api/v1/classes/${cid}/guardians`, { token });
+  const shAna = sharing.body.students[ana];
+  ok(
+    shAna.enrolled === true && shAna.guardians[0]?.status === "invited" && shAna.guardians[0]?.code,
+    "sharing state shows the enrollment and the pending invite",
+  );
+
+  const gReg = await api("POST", "/api/v1/auth/register", {
+    body: { email: `qa.grd.${stamp}@example.com`, password, role: "guardian", first: "Gina", last: "Alpha" },
+  });
+  const grdTok: string = gReg.body.access;
+  const badClaim = await api("POST", "/api/v1/guardian/claim", {
+    token: grdTok,
+    body: { code: "WRONGCODE000" },
+  });
+  ok(badClaim.status === 404, "wrong invite code rejected");
+  const claim = await api("POST", "/api/v1/guardian/claim", {
+    token: grdTok,
+    body: { code: inv.body.code },
+  });
+  ok(claim.status === 201 && claim.body.studentRowId === ana, "guardian claims the invite");
+
+  let kids = await api("GET", "/api/v1/guardian/children", { token: grdTok });
+  let kid = kids.body.children[0];
+  ok(kids.body.children.length === 1 && kid.name === "Alpha, Ana", "guardian sees the linked child");
+  ok(
+    kid.classes[0].class.scores[ana]?.[aid2] === 12 &&
+      kid.classes[0].scopes.includes("Missing work"),
+    "child view shares grades under the class policy",
+  );
+  ok(
+    kid.classes[0].class.remarks[ana] === undefined &&
+      !kid.classes[0].scopes.includes("Remarks"),
+    "remarks stay private while the Remarks scope is off",
+  );
+
+  await api("PATCH", `/api/v1/classes/${cid}`, {
+    token,
+    body: { guardianScopes: { Grades: true, Attendance: true, "Missing work": true, Remarks: true } },
+  });
+  kids = await api("GET", "/api/v1/guardian/children", { token: grdTok });
+  kid = kids.body.children[0];
+  ok(
+    kid.classes[0].class.remarks[ana] === "Doing better after consultation." &&
+      kid.classes[0].scopes.includes("Remarks"),
+    "turning the Remarks scope on shares the remark",
+  );
+
+  const unlink = await api("DELETE", `/api/v1/classes/${cid}/guardians`, {
+    token,
+    body: { linkId: shAna.guardians[0].id },
+  });
+  ok(unlink.status === 200, "guardian link revoked");
+  kids = await api("GET", "/api/v1/guardian/children", { token: grdTok });
+  ok(kids.body.children.length === 0, "revoked link removes the child view");
+
+  console.log("demo student + guardian tours");
+  const demoStu = await api("POST", "/api/v1/auth/login", {
+    body: { email: "a.reyes@student.univ.edu.ph", password: "ulat-demo-2026" },
+  });
+  ok(demoStu.status === 200, "demo student logs in");
+  const demoView = await api("GET", "/api/v1/student/classes", { token: demoStu.body.access });
+  const dv = demoView.body.classes[0];
+  ok(dv?.class.code === "CS101" && dv.studentRowId === "s7", "Ana is enrolled in CS101");
+  {
+    const local = seedClasses().find((k) => k.id === "cs101")!;
+    const a = compute(local, local.grading, "s7");
+    const b = compute(dv.class, dv.class.grading, "s7");
+    ok(a.pct === b.pct && a.grade === b.grade, "Ana's scoped view computes her exact grade");
+  }
+  const demoGrd = await api("POST", "/api/v1/auth/login", {
+    body: { email: "lorna.reyes@example.com", password: "ulat-demo-2026" },
+  });
+  ok(demoGrd.status === 200, "demo guardian logs in");
+  const demoKids = await api("GET", "/api/v1/guardian/children", { token: demoGrd.body.access });
+  ok(
+    demoKids.body.children[0]?.name === "Reyes, Ana" &&
+      demoKids.body.children[0].classes[0].class.code === "CS101",
+    "Lorna follows Ana's CS101",
+  );
+
   console.log("demo seed → shared grade engine");
   const demo = await api("POST", "/api/v1/auth/login", {
     body: { email: "d.rivera@univ.edu.ph", password: "ulat-demo-2026" },

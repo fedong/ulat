@@ -66,6 +66,12 @@ try {
   await page.getByText("Flag for consultation", { exact: true }).waitFor({ timeout: 15000 });
   ok(true, "unflag persists too — state fully restored");
 
+  console.log("sharing page (live links from the API)");
+  await page.goto(`${BASE}/c/cs101/sharing`);
+  await page.getByText("Lorna Reyes", { exact: false }).first().waitFor({ timeout: 15000 });
+  await page.getByText("on Ulat", { exact: true }).first().waitFor();
+  ok(true, "sharing shows the live guardian link and Ana's enrollment");
+
   console.log("saved indicator");
   await page.getByText("All changes saved", { exact: false }).waitFor({ timeout: 5000 });
   ok(true, "header shows all changes saved");

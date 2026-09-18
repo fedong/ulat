@@ -1,7 +1,6 @@
 import { create } from "zustand";
 import type { Klass } from "@ulat/grade-math";
-import { seedClasses } from "@ulat/grade-math";
-import type { EntitlementDto } from "./api";
+import type { EntitlementDto, GuardianChild, StudentClassRow } from "./api";
 import { todayIso } from "./derive";
 import { syncClassPatch } from "./sync";
 
@@ -22,18 +21,21 @@ export interface NaDraft {
 interface UlatMobile {
   /** Instructor's live classes, hydrated from the API after sign-in. */
   classes: Klass[];
-  /** Fixed demo data for the student/guardian showcase roles (until Phase 4). */
-  demoClasses: Klass[];
   /** Instructor's selected class. */
   clsId: string;
   period: string;
   lang: "English" | "Filipino";
 
-  // Instructor session (from /v1/auth/me)
+  // Session (from /v1/auth/me) — one signed-in account, role decides the UI.
   signedIn: boolean;
+  role: "instructor" | "student" | "guardian" | null;
   email: string;
   meName: string;
   ent: EntitlementDto | null;
+  /** Student role: live per-class views (null until hydrated). */
+  sLive: StudentClassRow[] | null;
+  /** Guardian role: live children with scope-gated views (null until hydrated). */
+  gKids: GuardianChild[] | null;
 
   // Instructor (4b)
   ptabI: ITab;
@@ -43,8 +45,7 @@ interface UlatMobile {
   phoneToastAct: { label: string; run: () => void } | null;
   na: NaDraft;
 
-  // Student (4c) — the demo student account (Ana Reyes).
-  studentId: string;
+  // Student (4c)
   ptabS: STab;
   sFocusCode: string | null;
   sClsCode: string | null;
@@ -63,15 +64,17 @@ let toastTimer: ReturnType<typeof setTimeout> | null = null;
 
 export const useUlat = create<UlatMobile>((set, get) => ({
   classes: [],
-  demoClasses: seedClasses(),
   clsId: "",
   period: "Semi-finals",
   lang: "English",
 
   signedIn: false,
+  role: null,
   email: "",
   meName: "",
   ent: null,
+  sLive: null,
+  gKids: null,
 
   ptabI: "classes",
   phoneAsmId: null,
@@ -80,7 +83,6 @@ export const useUlat = create<UlatMobile>((set, get) => ({
   phoneToastAct: null,
   na: { name: "", comp: "", period: "Semi-finals", max: "", later: false, date: todayIso(), notes: "" },
 
-  studentId: "s7", // Reyes, Ana
   ptabS: "home",
   sFocusCode: null,
   sClsCode: null,

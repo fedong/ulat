@@ -109,6 +109,40 @@ export function toKlass(c: FullClass): Klass {
   };
 }
 
+/**
+ * Narrow a full Klass to what one student (or their guardian) may see: their
+ * own row, scores, marks and notes only — and never the join code. `remarks`
+ * false (guardian scope "Remarks" off) strips remark text and history.
+ */
+export function scopeToStudent(k: Klass, sid: string, opts: { remarks: boolean }): Klass {
+  return {
+    ...k,
+    joinCode: "",
+    roster: k.roster.filter((r) => r.id === sid),
+    scores: { [sid]: k.scores[sid] || {} },
+    sessions: k.sessions.map((s) => ({
+      ...s,
+      marks: (s.marks[sid] ? { [sid]: s.marks[sid] } : {}) as typeof s.marks,
+    })),
+    remarks: opts.remarks && k.remarks[sid] ? { [sid]: k.remarks[sid] } : {},
+    remarkLog: opts.remarks && k.remarkLog?.[sid] ? { [sid]: k.remarkLog[sid] } : {},
+    flags: k.flags?.[sid] ? { [sid]: true } : {},
+    consults: k.consults?.[sid] != null ? { [sid]: k.consults[sid] } : {},
+    archive: [],
+    team: [],
+  };
+}
+
+/** Instructor display name for student/guardian payloads (never the email). */
+export function instructorNameOf(profile: unknown): string {
+  const p = (profile ?? {}) as { title?: string; first?: string; last?: string; nameStyle?: string };
+  const short = p.nameStyle !== "full";
+  const name = short
+    ? [p.title, p.last].filter(Boolean).join(" ")
+    : [p.title, p.first, p.last].filter(Boolean).join(" ");
+  return name.trim() || "Instructor";
+}
+
 export function classSummary(c: Class & { students?: { id: string }[] }) {
   return {
     id: c.id,

@@ -75,15 +75,40 @@ try {
   await vis("Start today's session").waitFor({ timeout: 10000 });
   ok(true, "discard persisted — the session is gone after reload");
 
-  console.log("student + guardian demo roles still work");
-  await page.goto(APP);
-  await vis("I'm a student").click();
-  await vis("Ana", false).waitFor({ timeout: 20000 });
-  ok(true, "student demo renders");
-  await page.goto(APP);
-  await vis("I'm a guardian").click();
-  await vis("Reyes", false).waitFor({ timeout: 20000 });
-  ok(true, "guardian demo renders");
+  console.log("student role (live account)");
+  const ctxS = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const ps = await ctxS.newPage();
+  const visS = (text, exact = true) =>
+    ps.getByText(text, { exact }).locator("visible=true").first();
+  await ps.goto(APP);
+  await visS("I'm a student").click();
+  await visS("Sign in as student").waitFor({ timeout: 20000 });
+  await visS("Tour the demo account").click();
+  await visS("Ana", false).waitFor({ timeout: 20000 });
+  await visS("CS101 · Intro to Computing", false).waitFor();
+  ok(true, "demo student signs in and sees CS101 live from the API");
+  await visS("CS101 · Intro to Computing", false).click();
+  await visS("Your standing", false).waitFor({ timeout: 10000 });
+  await visS("Weighted total").waitFor();
+  ok(true, "class detail shows the live component breakdown");
+  await ctxS.close();
+
+  console.log("guardian role (live account)");
+  const ctxG = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  const pg = await ctxG.newPage();
+  const visG = (text, exact = true) =>
+    pg.getByText(text, { exact }).locator("visible=true").first();
+  await pg.goto(APP);
+  await visG("I'm a guardian").click();
+  await visG("Sign in as guardian").waitFor({ timeout: 20000 });
+  await visG("Tour the demo account").click();
+  await visG("Mrs. Reyes", false).waitFor({ timeout: 20000 });
+  await visG("Reyes, Ana", false).waitFor();
+  ok(true, "demo guardian signs in and follows Ana live from the API");
+  await visG("Reyes, Ana", false).click();
+  await visG("CS101 · Intro to Computing", false).waitFor({ timeout: 10000 });
+  ok(true, "child's classes include the live CS101 shared view");
+  await ctxG.close();
 
   console.log(`\nAll ${passed} checks passed.`);
 } catch (e) {

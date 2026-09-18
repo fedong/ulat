@@ -69,7 +69,9 @@ node scripts/web-e2e.mjs      # browser E2E (Playwright): sign-in, writes, persi
 node scripts/mobile-e2e.mjs   # browser E2E for the mobile web export (see its header)
 ```
 
-Demo account: `d.rivera@univ.edu.ph` / `ulat-demo-2026` (Pro trial).
+Demo accounts (all `ulat-demo-2026`): instructor `d.rivera@univ.edu.ph`
+(Pro trial), student `a.reyes@student.univ.edu.ph` (Ana, enrolled in CS101),
+guardian `lorna.reyes@example.com` (Lorna, following Ana).
 
 Endpoints (all JSON, `Authorization: Bearer <access>` after auth):
 
@@ -83,6 +85,10 @@ Endpoints (all JSON, `Authorization: Bearer <access>` after auth):
 | `POST/PATCH/DELETE /api/v1/classes/[id]/assessments` | Create with validation + attendance-linked MISSED/EXC prefill; edit; archive/restore; delete (scores cascade) |
 | `POST/PATCH/DELETE /api/v1/classes/[id]/students` | Add to roster (client ids accepted), edit fields/flag/remark/consultation, soft remove |
 | `POST/PATCH/DELETE /api/v1/classes/[id]/sessions` | Start today's session (idempotent, everyone Present), set one mark (A/E carry into same-day assessments unless hand-edited), discard (reverses only auto-carried scores) — addressed by id or `(date, groupId)` |
+| `GET/POST/DELETE /api/v1/classes/[id]/guardians` | Sharing state per student (enrollment + links), create a guardian invite (returns the claim code), revoke |
+| `POST /api/v1/join` | Student joins a class: join code + student number or name, matched against the roster |
+| `GET /api/v1/student/classes` | The student's scoped view of each enrolled class (own row/scores/marks only, never the join code) — still the `Klass` shape, so the shared grade engine runs on it |
+| `POST /api/v1/guardian/claim` · `GET /api/v1/guardian/children` | Claim an invite code; children with scope-gated class views (Grades and Attendance always shared, "Missing work"/Remarks per class policy, remarks stripped server-side when off) |
 
 ## Structure
 
@@ -166,4 +172,19 @@ the mobile web build. Covered by `scripts/mobile-e2e.mjs` (browser over the
 Expo web export: sign-in, live classes, attendance session started, persisted
 across reload + session restore, discarded, and the demo roles intact).
 
-Next milestone: student/guardian accounts + sharing and guardian invites.
+Phase 4: student and guardian accounts are real. Students register on the
+mobile app and join a class with the instructor's join code plus their student
+number (or name) — the roster row is the approval. Guardians register and
+claim a one-time invite code that the instructor creates from the web Sharing
+page, which now runs on live data: real links and pending invites per
+student, an "on Ulat" badge for enrolled students, and invite creation that
+hands back the claim code. The API serves scope-gated views (`/v1/student/…`,
+`/v1/guardian/…`): a student sees only their own row, scores, marks and
+remarks — never the join code — and guardians follow each class's policy
+(Grades and Attendance always, "Missing work"/Remarks per class, remarks
+stripped server-side when off). The mobile student and guardian roles run on
+these views end to end — multi-class live cards, component breakdowns, alerts
+and empty states that walk new accounts through joining or linking — while
+the seeded demo tour keeps its static showcase classes beside the live one.
+
+Next milestone: payments (PayMongo) & entitlements, then the Coolify deploy.

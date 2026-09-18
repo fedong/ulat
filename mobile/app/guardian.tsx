@@ -1,17 +1,21 @@
-import React, { useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { router } from "expo-router";
 import { Pressable, StyleSheet, Text, View } from "react-native";
+import { ApiError } from "@/api";
 import { firstNameOf, greeting, initialsOfRosterName } from "@/derive";
 import { DEMO_GUARDIAN, KLABEL, MIGUEL_CLASSES, OTHER_CLASSES, type StaticClass } from "@/demo";
 import { buildLive, type StripTile } from "@/live";
+import { doClaimInvite, doSignOut } from "@/session";
 import { useUlat, type GTab } from "@/store";
 import { C, F } from "@/theme";
 import {
   BackPill,
   Card,
   Chip,
+  FocusInput,
   PhoneShell,
   PressableScale,
+  PrimaryButton,
   SectionTitle,
   TabBar,
   UpcomingRow,
@@ -23,37 +27,117 @@ interface Kid {
   first: string;
   initials: string;
   meta: string;
-  classes: StaticClass[];
+  classes: GClass[];
 }
 
-export default function GuardianScreen() {
-  const st = useUlat();
-  const cls = st.demoClasses.find((c) => c.id === "cs101")!;
-  const sr = cls.roster.find((r) => r.id === st.studentId) || cls.roster[0];
-  const fil = st.lang === "Filipino";
+/** A shared class card carrying its own period strip + term (live ones). */
+type GClass = StaticClass & {
+  term?: ReturnType<typeof buildLive>["term"];
+  strip?: StripTile[];
+};
 
-  const { live, term, strip } = useMemo(() => buildLive(cls, sr.id), [cls, sr.id]);
+/** Demo guardian keeps Miguel and the static showcase classes. */
+const DEMO_GUARDIAN_EMAIL = "lorna.reyes@example.com";
+
+/** Route component: the guardian role needs a signed-in guardian account. */
+export default function GuardianScreen() {
+  const signedIn = useUlat((s) => s.signedIn);
+  const role = useUlat((s) => s.role);
+  useEffect(() => {
+    if (!signedIn || role !== "guardian") router.replace("/signin?role=guardian" as never);
+  }, [signedIn, role]);
+  if (!signedIn || role !== "guardian") return null;
+  return <GuardianInner />;
+}
+
+/** Empty state: link the first child with the instructor's invite code. */
+function ClaimInviteCard() {
+  const [code, setCode] = useState("");
+  const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
+  const claim = async () => {
+    if (busy) return;
+    if (!code.trim()) return setErr("Enter the invite code from the instructor.");
+    setBusy(true);
+    setErr("");
+    try {
+      await doClaimInvite(code.trim());
+    } catch (ex) {
+      setErr(
+        ex instanceof ApiError && ex.status !== 500
+          ? ex.message
+          : "Couldn't reach Ulat. Check your connection and try again.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <Card style={{ gap: 10, paddingVertical: 20 }}>
+      <Text style={{ fontFamily: F.d800, fontSize: 17, color: C.ink }}>Link your child</Text>
+      <Text style={{ fontFamily: F.b400, fontSize: 13, color: C.sub, lineHeight: 19 }}>
+        The instructor creates an invite from their Sharing page and gives you a one-time code.
+        Enter it here to start following your child&apos;s classes.
+      </Text>
+      <FocusInput
+        value={code}
+        onChangeText={(v) => {
+          setCode(v);
+          setErr("");
+        }}
+        placeholder="Invite code"
+        autoCapitalize="characters"
+        style={{
+          height: 46,
+          borderRadius: 12,
+          borderWidth: 1.5,
+          borderColor: C.line,
+          backgroundColor: "#FFFFFF",
+          paddingHorizontal: 12,
+          fontFamily: F.b500,
+          fontSize: 14,
+          color: C.ink,
+        }}
+      />
+      {!!err && <Text style={{ fontFamily: F.b600, fontSize: 12.5, color: C.redText }}>{err}</Text>}
+      <PrimaryButton label={busy ? "Linking…" : "Link child"} onPress={() => void claim()} disabled={busy} />
+    </Card>
+  );
+}
+
+function GuardianInner() {
+  const st = useUlat();
+  const fil = st.lang === "Filipino";
+  const isDemo = st.email === DEMO_GUARDIAN_EMAIL;
 
   const kids: Kid[] = useMemo(() => {
-    const anaClasses = [live, ...OTHER_CLASSES()];
-    const miguelClasses = MIGUEL_CLASSES();
-    return [
-      {
-        name: sr.name,
-        first: firstNameOf(sr.name),
-        initials: initialsOfRosterName(sr.name),
-        meta: anaClasses.length + " classes shared",
-        classes: anaClasses,
-      },
-      {
+    const liveKids: Kid[] = (st.gKids ?? []).map((k) => {
+      const classes: GClass[] = k.classes.map((r) => {
+        const b = buildLive(r.class, r.studentRowId, { instructor: r.instructor, scopes: r.scopes });
+        return { ...b.live, term: b.term, strip: b.strip };
+      });
+      return {
+        name: k.name,
+        first: firstNameOf(k.name),
+        initials: initialsOfRosterName(k.name),
+        meta: classes.length + (classes.length === 1 ? " class shared" : " classes shared"),
+        classes,
+      };
+    });
+    if (isDemo && liveKids[0]) {
+      // Demo tour: the static showcase classes and Miguel ride along.
+      liveKids[0].classes = [...liveKids[0].classes, ...OTHER_CLASSES()];
+      liveKids[0].meta = liveKids[0].classes.length + " classes shared";
+      liveKids.push({
         name: "Reyes, Miguel",
         first: "Miguel",
         initials: "MR",
-        meta: miguelClasses.length + " classes shared",
-        classes: miguelClasses,
-      },
-    ];
-  }, [live, sr]);
+        meta: MIGUEL_CLASSES().length + " classes shared",
+        classes: MIGUEL_CLASSES(),
+      });
+    }
+    return liveKids;
+  }, [st.gKids, isDemo]);
 
   const order: Record<string, number> = { fail: 0, inc: 1, risk: 2, pass: 3 };
   const worstOf = (k: Kid) => k.classes.slice().sort((a, b) => order[a.k] - order[b.k])[0];
@@ -162,7 +246,7 @@ export default function GuardianScreen() {
             : kids.length + " children linked"
         : st.ptabG === "alerts"
           ? "All children"
-          : DEMO_GUARDIAN.name;
+          : st.meName || DEMO_GUARDIAN.name;
 
   const childRow = (k: Kid, i: number, inCard: boolean) => {
     const w = worstOf(k);
@@ -195,6 +279,33 @@ export default function GuardianScreen() {
     );
   };
 
+  /* ---- no children yet: everything funnels into the invite-code card ---- */
+  if (kids.length === 0)
+    return (
+      <PhoneShell title="Home" sub="Link your first child" tabBar={null}>
+        <Card style={{ gap: 0 }}>
+          <Text style={{ fontFamily: F.b400, fontSize: 13, color: C.sub }}>{greeting(fil)}</Text>
+          <Text style={{ fontFamily: F.d800, fontSize: 24, letterSpacing: -0.4, color: C.ink }}>
+            {st.meName || "Welcome"}
+          </Text>
+        </Card>
+        <ClaimInviteCard />
+        <PressableScale
+          scaleTo={0.98}
+          onPress={() => {
+            void doSignOut();
+            router.replace("/");
+          }}
+        >
+          <View style={s.signOut}>
+            <Text style={{ fontFamily: F.b700, fontSize: 13, color: C.redText }}>
+              {fil ? "Mag-sign out" : "Sign out"}
+            </Text>
+          </View>
+        </PressableScale>
+      </PhoneShell>
+    );
+
   return (
     <PhoneShell
       title={title}
@@ -207,7 +318,7 @@ export default function GuardianScreen() {
           <Card style={{ gap: 0 }}>
             <Text style={{ fontFamily: F.b400, fontSize: 13, color: C.sub }}>{greeting(fil)}</Text>
             <Text style={{ fontFamily: F.d800, fontSize: 24, letterSpacing: -0.4, color: C.ink }}>
-              {fil ? "Gng. Reyes" : DEMO_GUARDIAN.shortName}
+              {isDemo ? (fil ? "Gng. Reyes" : DEMO_GUARDIAN.shortName) : st.meName || "Welcome"}
             </Text>
           </Card>
           <Card style={{ gap: 8 }}>
@@ -306,10 +417,16 @@ export default function GuardianScreen() {
         <SharedView
           kidFirst={gKid.first}
           x={gClsSel}
-          strip={gClsSel.live ? strip : null}
-          termLabel={gClsSel.live ? term.label : ""}
-          termText={gClsSel.live ? (term.pct === null ? "—" : term.grade + " · " + term.pctText) : ""}
-          termColor={gClsSel.live ? term.color : C.sub}
+          strip={(gClsSel as GClass).strip ?? null}
+          termLabel={(gClsSel as GClass).term?.label ?? ""}
+          termText={
+            (gClsSel as GClass).term
+              ? (gClsSel as GClass).term!.pct === null
+                ? "—"
+                : (gClsSel as GClass).term!.grade + " · " + (gClsSel as GClass).term!.pctText
+              : ""
+          }
+          termColor={(gClsSel as GClass).term?.color ?? C.sub}
           onBack={() => st.set({ gCls: null })}
         />
       )}
@@ -347,32 +464,38 @@ export default function GuardianScreen() {
         <>
           <Card style={{ alignItems: "center", paddingVertical: 24, gap: 6 }}>
             <View style={s.avatar}>
-              <Text style={{ fontFamily: F.d800, fontSize: 22, color: "#FFFFFF" }}>LR</Text>
+              <Text style={{ fontFamily: F.d800, fontSize: 22, color: "#FFFFFF" }}>
+                {(st.meName.match(/\b([A-Z])/g) || ["G"]).slice(-2).join("")}
+              </Text>
             </View>
-            <Text style={{ fontFamily: F.d800, fontSize: 18, color: C.ink }}>{DEMO_GUARDIAN.name}</Text>
+            <Text style={{ fontFamily: F.d800, fontSize: 18, color: C.ink }}>
+              {st.meName || DEMO_GUARDIAN.name}
+            </Text>
             <Text style={{ fontFamily: F.b400, fontSize: 13, color: C.sub }}>
               Guardian of {kids.map((k) => k.first).join(" and ")}
             </Text>
             {/* Chip self-aligns flex-start for inline use; center it here. */}
             <View style={{ alignSelf: "center" }}>
-              <Chip text={DEMO_GUARDIAN.role} bg="rgba(212,90,140,0.14)" color="#8C2F5A" />
+              <Chip
+                text={st.gKids?.[0]?.role || DEMO_GUARDIAN.role}
+                bg="rgba(212,90,140,0.14)"
+                color="#8C2F5A"
+              />
             </View>
           </Card>
           <Card style={{ gap: 10 }}>
             <SectionTitle>What {kids[0].first} shares</SectionTitle>
             <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
-              {[
-                ["Grades", true],
-                ["Attendance", true],
-                ["Missing work", true],
-                ["Remarks", false],
-              ].map(([k, on], i) => (
-                <View key={i} style={s.shareChip}>
-                  <Text style={{ fontFamily: F.b600, fontSize: 12, color: on ? C.tealText : C.faint }}>
-                    {k as string} · {on ? "Shared" : "Hidden"}
-                  </Text>
-                </View>
-              ))}
+              {(["Grades", "Attendance", "Missing work", "Remarks"] as const).map((k, i) => {
+                const on = (kids[0].classes[0]?.scopes || []).includes(k);
+                return (
+                  <View key={i} style={s.shareChip}>
+                    <Text style={{ fontFamily: F.b600, fontSize: 12, color: on ? C.tealText : C.faint }}>
+                      {k} · {on ? "Shared" : "Hidden"}
+                    </Text>
+                  </View>
+                );
+              })}
             </View>
             <Text style={{ fontFamily: F.b400, fontSize: 12, color: C.sub, lineHeight: 18 }}>
               Guardian links belong to the student&apos;s account and carry over to all their classes.
@@ -386,7 +509,13 @@ export default function GuardianScreen() {
               upcoming work beats a long talk after grades close.
             </Text>
           </Card>
-          <PressableScale scaleTo={0.98} onPress={() => router.back()}>
+          <PressableScale
+            scaleTo={0.98}
+            onPress={() => {
+              void doSignOut();
+              router.replace("/");
+            }}
+          >
             <View style={s.signOut}>
               <Text style={{ fontFamily: F.b700, fontSize: 13, color: C.redText }}>
                 {fil ? "Mag-sign out" : "Sign out"}

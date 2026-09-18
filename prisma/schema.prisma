@@ -46,6 +46,42 @@ model User {
 
   classes       Class[]
   refreshTokens RefreshToken[]
+  enrollments   Enrollment[]
+  guardianLinks GuardianLink[]
+}
+
+/// A student account claimed one roster row via the class join code.
+model Enrollment {
+  id           String     @id @default(cuid())
+  userId       String
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  studentRowId String     @unique
+  studentRow   StudentRow @relation(fields: [studentRowId], references: [id], onDelete: Cascade)
+  createdAt    DateTime   @default(now())
+
+  @@index([userId])
+}
+
+/// Guardian ↔ student-row link. Created as an invite (code, no guardian yet)
+/// by the instructor's Sharing page; a guardian account claims the code.
+/// Grouping rows of the same real student into one account-level link comes
+/// once student accounts span classes.
+model GuardianLink {
+  id           String     @id @default(cuid())
+  studentRowId String
+  studentRow   StudentRow @relation(fields: [studentRowId], references: [id], onDelete: Cascade)
+  guardianId   String?
+  guardian     User?      @relation(fields: [guardianId], references: [id], onDelete: Cascade)
+  /// Display name + contact from the invite (e.g. "Lorna Reyes", mobile/email).
+  name    String
+  contact String @default("")
+  role    String @default("Guardian") // Mother | Father | Grandparent | Guardian
+  code    String @unique
+  status  String @default("invited") // invited | active
+  createdAt DateTime @default(now())
+
+  @@index([guardianId])
+  @@index([studentRowId])
 }
 
 model RefreshToken {
@@ -113,7 +149,9 @@ model StudentRow {
   /// longer counted or shown; re-adding by the same student number restores.
   removedAt   DateTime?
 
-  scores Score[]
+  scores        Score[]
+  enrollment    Enrollment?
+  guardianLinks GuardianLink[]
 
   @@index([classId])
 }

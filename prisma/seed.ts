@@ -76,11 +76,11 @@ async function insertClass(ownerId: string, k: Klass) {
   if (scoreRows.length) await prisma.score.createMany({ data: scoreRows });
 }
 
-async function main() {
+async function seedInstructor() {
   const email = "d.rivera@univ.edu.ph";
   const existing = await prisma.user.findUnique({ where: { email } });
   if (existing) {
-    console.log("Demo user already seeded — skipping.");
+    console.log("Demo instructor already seeded — skipping.");
     return;
   }
   const user = await prisma.user.create({
@@ -105,6 +105,70 @@ async function main() {
   });
   for (const k of seedClasses()) await insertClass(user.id, k);
   console.log("Seeded demo instructor with", (await prisma.class.count()), "classes.");
+}
+
+/** Demo student: Ana Reyes (s7 in CS101), for the mobile student tour. */
+async function seedStudent() {
+  const email = "a.reyes@student.univ.edu.ph";
+  if (await prisma.user.findUnique({ where: { email } })) {
+    console.log("Demo student already seeded — skipping.");
+    return;
+  }
+  const row = await prisma.studentRow.findUnique({ where: { id: "s7" } });
+  if (!row) return console.log("CS101 roster missing — student not seeded.");
+  const user = await prisma.user.create({
+    data: {
+      email,
+      passwordHash: await bcrypt.hash("ulat-demo-2026", 10),
+      role: "STUDENT",
+      entState: "FREE",
+      profile: { first: "Ana", last: "Reyes", nameStyle: "short", lang: "English" },
+    },
+  });
+  await prisma.enrollment.upsert({
+    where: { studentRowId: "s7" },
+    create: { userId: user.id, studentRowId: "s7" },
+    update: { userId: user.id },
+  });
+  console.log("Seeded demo student (Ana Reyes → CS101 s7).");
+}
+
+/** Demo guardian: Lorna Reyes following Ana, for the mobile guardian tour. */
+async function seedGuardian() {
+  const email = "lorna.reyes@example.com";
+  if (await prisma.user.findUnique({ where: { email } })) {
+    console.log("Demo guardian already seeded — skipping.");
+    return;
+  }
+  const row = await prisma.studentRow.findUnique({ where: { id: "s7" } });
+  if (!row) return console.log("CS101 roster missing — guardian not seeded.");
+  const user = await prisma.user.create({
+    data: {
+      email,
+      passwordHash: await bcrypt.hash("ulat-demo-2026", 10),
+      role: "GUARDIAN",
+      entState: "FREE",
+      profile: { first: "Lorna", last: "Reyes", nameStyle: "short", lang: "English" },
+    },
+  });
+  await prisma.guardianLink.create({
+    data: {
+      studentRowId: "s7",
+      guardianId: user.id,
+      name: "Lorna Reyes",
+      contact: "0917 555 0188",
+      role: "Mother",
+      code: "GRDDEMO00000",
+      status: "active",
+    },
+  });
+  console.log("Seeded demo guardian (Lorna Reyes → Ana).");
+}
+
+async function main() {
+  await seedInstructor();
+  await seedStudent();
+  await seedGuardian();
 }
 
 main().finally(() => prisma.$disconnect());

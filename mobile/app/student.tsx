@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { router } from "expo-router";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import {
@@ -8,28 +8,33 @@ import {
   periodOf,
   shortPeriod,
   termOf,
+  type Computed,
+  type Klass,
+  type TermResult,
 } from "@ulat/grade-math";
 import {
   consultSummary,
   countdown,
-  DEMO_INSTRUCTOR,
   firstNameOf,
-  fmtDate,
   greeting,
   hasConsultHours,
   passingLineOf,
   todayIso,
 } from "@/derive";
+import { ApiError } from "@/api";
 import { OTHER_CLASSES, type StaticClass, type UpcomingItem } from "@/demo";
 import { currentPeriodOf } from "@/live";
+import { doJoinClass, doSignOut } from "@/session";
 import { useUlat, type STab } from "@/store";
 import { C, F } from "@/theme";
 import {
   animateNextLayout,
   Card,
   Chip,
+  FocusInput,
   PhoneShell,
   PressableScale,
+  PrimaryButton,
   SectionTitle,
   TabBar,
   UpcomingRow,
@@ -38,125 +43,252 @@ import {
 
 const SEG_COLORS = ["#0FA3A0", "#5BBFBD", "#9AD9D7", "#C9ECEB"];
 
-export default function StudentScreen() {
-  const st = useUlat();
-  const cls = st.demoClasses.find((c) => c.id === "cs101")!;
+/** Demo student keeps the static showcase classes beside the live one. */
+const DEMO_STUDENT_EMAIL = "a.reyes@student.univ.edu.ph";
+
+interface StripRow {
+  short: string;
+  value: string;
+  color: string;
+  bg: string;
+  border: string;
+}
+
+/** A live class card with everything the detail view needs attached. */
+type LiveCard = StaticClass & {
+  c: Computed;
+  term: TermResult;
+  strip: StripRow[];
+  clsRef: Klass;
+  sid: string;
+  period: string;
+  periodClosed: boolean;
+  flagged: boolean;
+  hasHours: boolean;
+  consultText: string;
+  section: string;
+  no: string;
+  rosterName: string;
+  passing: number;
+};
+
+function buildCard(cls: Klass, sid: string, instructor: string): LiveCard {
   const gs = cls.grading;
-  const sr = cls.roster.find((r) => r.id === st.studentId) || cls.roster[0];
-  const first = firstNameOf(sr.name);
-  const fil = st.lang === "Filipino";
-
-  // The class's live period: the last open period where scores are recorded.
-  const period = useMemo(() => currentPeriodOf(cls, sr.id), [cls, sr.id]);
-  const periodClosed = !!(cls.closed || {})[period];
-  const passing = Number(gs.passing) || 0;
-
-  const { live, term, strip } = useMemo(() => {
-    const asmsP = cls.assessments.filter((a) => a.period === period);
-    const c = compute(cls, gs, sr.id, null, asmsP);
-    const rate = attRate(cls, sr.id);
-    const missing = c.missing.map((a) => a.name);
-    const upcoming: UpcomingItem[] = cls.assessments
-      .filter((a) => {
-        const v = (cls.scores[sr.id] || {})[a.id];
-        return a.date > todayIso() && (v === undefined || v === null);
-      })
-      .sort((a, b) => (a.date < b.date ? -1 : 1))
-      .map((a) => {
-        const dt = new Date(a.date + "T00:00:00");
-        const cp = gs.groups.flatMap((g) => g.comps).find((x) => x.id === a.comp);
-        return {
-          iso: a.date,
-          code: cls.code,
-          name: a.name,
-          max: a.max,
-          compPath: cp ? cp.name : "Unassigned",
-          countdown: countdown(a.date),
-          day: dt.getDate(),
-          mon: dt.toLocaleDateString("en-US", { month: "short" }).toUpperCase(),
-          notes: a.notes || "",
-        };
-      });
-    const t = termOf(cls, gs, cls.periods, sr.id);
-    const stripRows = cls.periods.map((p) => {
-      const r = periodOf(cls, gs, sr.id, p);
+  const period = currentPeriodOf(cls, sid);
+  const asmsP = cls.assessments.filter((a) => a.period === period);
+  const c = compute(cls, gs, sid, null, asmsP);
+  const rate = attRate(cls, sid);
+  const upcoming: UpcomingItem[] = cls.assessments
+    .filter((a) => {
+      const v = (cls.scores[sid] || {})[a.id];
+      return a.date > todayIso() && (v === undefined || v === null);
+    })
+    .sort((a, b) => (a.date < b.date ? -1 : 1))
+    .map((a) => {
+      const dt = new Date(a.date + "T00:00:00");
+      const cp = gs.groups.flatMap((g) => g.comps).find((x) => x.id === a.comp);
       return {
-        short: shortPeriod(p),
-        value: r && r.pct !== null ? r.grade : "—",
-        color: r && r.pct !== null ? r.color : C.faint,
-        bg: p === period ? C.tealTint8 : (cls.closed || {})[p] ? C.canvas : "#FFFFFF",
-        border: p === period ? C.teal : C.line,
+        iso: a.date,
+        code: cls.code,
+        name: a.name,
+        max: a.max,
+        compPath: cp ? cp.name : "Unassigned",
+        countdown: countdown(a.date),
+        day: dt.getDate(),
+        mon: dt.toLocaleDateString("en-US", { month: "short" }).toUpperCase(),
+        notes: a.notes || "",
       };
     });
-    const liveCls: StaticClass & { c: ReturnType<typeof compute> } = {
-      live: true,
-      code: cls.code,
-      title: cls.title,
-      instructor: DEMO_INSTRUCTOR.name,
-      grade: c.grade,
-      k: c.k,
-      pct: c.pctText,
-      att: rate + "%",
-      attColor: attColor(rate),
-      color: c.color,
-      bg: c.bg,
-      chipPlain: c.chipPlain,
-      passingLine: passingLineOf(gs),
-      missing,
-      upcoming,
-      remark: cls.remarks[sr.id] || "",
-      scopes: ["Grades", "Attendance", "Missing work"],
-      status: "Active",
-      c,
+  const term = termOf(cls, gs, cls.periods, sid);
+  const strip: StripRow[] = cls.periods.map((p) => {
+    const r = periodOf(cls, gs, sid, p);
+    return {
+      short: shortPeriod(p),
+      value: r && r.pct !== null ? r.grade : "—",
+      color: r && r.pct !== null ? r.color : C.faint,
+      bg: p === period ? C.tealTint8 : (cls.closed || {})[p] ? C.canvas : "#FFFFFF",
+      border: p === period ? C.teal : C.line,
     };
-    return { live: liveCls, term: t, strip: stripRows };
-  }, [cls, gs, sr, period]);
+  });
+  const row = cls.roster.find((r) => r.id === sid);
+  return {
+    live: true,
+    code: cls.code,
+    title: cls.title,
+    instructor,
+    grade: c.grade,
+    k: c.k,
+    pct: c.pctText,
+    att: rate + "%",
+    attColor: attColor(rate),
+    color: c.color,
+    bg: c.bg,
+    chipPlain: c.chipPlain,
+    passingLine: passingLineOf(gs),
+    missing: c.missing.map((a) => a.name),
+    upcoming,
+    remark: cls.remarks[sid] || "",
+    scopes: ["Grades", "Attendance", "Missing work"],
+    status: "Active",
+    c,
+    term,
+    strip,
+    clsRef: cls,
+    sid,
+    period,
+    periodClosed: !!(cls.closed || {})[period],
+    flagged: !!(cls.flags || {})[sid],
+    hasHours: hasConsultHours(cls),
+    consultText: consultSummary(cls),
+    section: cls.section,
+    no: row?.no || "",
+    rosterName: row?.name || "",
+    passing: Number(gs.passing) || 0,
+  };
+}
 
-  const others = useMemo(() => OTHER_CLASSES(), []);
-  const sAll: StaticClass[] = [live, ...others];
-  const flagged = !!(cls.flags || {})[sr.id];
-  const hasHours = hasConsultHours(cls);
+/** Route component: the student role needs a signed-in student account. */
+export default function StudentScreen() {
+  const signedIn = useUlat((s) => s.signedIn);
+  const role = useUlat((s) => s.role);
+  useEffect(() => {
+    if (!signedIn || role !== "student") router.replace("/signin?role=student" as never);
+  }, [signedIn, role]);
+  if (!signedIn || role !== "student") return null;
+  return <StudentInner />;
+}
+
+/** Empty state: join the first class with the instructor's code. */
+function JoinClassCard() {
+  const [code, setCode] = useState("");
+  const [no, setNo] = useState("");
+  const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
+  const join = async () => {
+    if (busy) return;
+    if (!code.trim() || !no.trim())
+      return setErr("Enter the class code and your student number (or full name).");
+    setBusy(true);
+    setErr("");
+    try {
+      // Whatever they typed works as a student number first, then as a name.
+      await doJoinClass(code.trim(), /^[\d-]+$/.test(no.trim()) ? { studentNo: no.trim() } : { name: no.trim() });
+    } catch (ex) {
+      setErr(
+        ex instanceof ApiError && ex.status !== 500
+          ? ex.message
+          : "Couldn't reach Ulat. Check your connection and try again.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <Card style={{ gap: 10, paddingVertical: 20 }}>
+      <Text style={{ fontFamily: F.d800, fontSize: 17, color: C.ink }}>Join your class</Text>
+      <Text style={{ fontFamily: F.b400, fontSize: 13, color: C.sub, lineHeight: 19 }}>
+        Ask your instructor for the class code, then enter it with your student number so we can
+        find you on the class list.
+      </Text>
+      <FocusInput
+        value={code}
+        onChangeText={(v) => {
+          setCode(v);
+          setErr("");
+        }}
+        placeholder="Class code (e.g. CS1A2Q)"
+        autoCapitalize="characters"
+        style={sj.input}
+      />
+      <FocusInput
+        value={no}
+        onChangeText={(v) => {
+          setNo(v);
+          setErr("");
+        }}
+        placeholder="Student number (or full name)"
+        style={sj.input}
+      />
+      {!!err && <Text style={{ fontFamily: F.b600, fontSize: 12.5, color: C.redText }}>{err}</Text>}
+      <PrimaryButton label={busy ? "Joining…" : "Join class"} onPress={() => void join()} disabled={busy} />
+    </Card>
+  );
+}
+
+const sj = StyleSheet.create({
+  input: {
+    height: 46,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: C.line,
+    backgroundColor: "#FFFFFF",
+    paddingHorizontal: 12,
+    fontFamily: F.b500,
+    fontSize: 14,
+    color: C.ink,
+  },
+});
+
+function StudentInner() {
+  const st = useUlat();
+  const fil = st.lang === "Filipino";
+  const isDemo = st.email === DEMO_STUDENT_EMAIL;
+
+  const lives: LiveCard[] = useMemo(
+    () => (st.sLive ?? []).map((r) => buildCard(r.class, r.studentRowId, r.instructor)),
+    [st.sLive],
+  );
+  const others = useMemo(() => (isDemo ? OTHER_CLASSES() : []), [isDemo]);
+  const sAll: StaticClass[] = [...lives, ...others];
+
+  const main = lives[0] ?? null;
+  const first = main ? firstNameOf(main.rosterName) : st.meName.split(" ")[0] || "there";
+  const mainPeriod = main?.period || "";
 
   const sFocus = sAll.find((x) => x.code === st.sFocusCode) || sAll[0];
   const sCls = sAll.find((x) => x.code === st.sClsCode) || sAll[0];
+  const sClsLive = sCls?.live ? (sCls as LiveCard) : null;
+  const sFocusLive = sFocus?.live ? (sFocus as LiveCard) : null;
   const sUpcoming = sAll.flatMap((x) => x.upcoming).sort((a, b) => (a.iso < b.iso ? -1 : 1));
 
   const alerts = useMemo(() => {
     const rows: { title: string; body: string; bg: string; color: string; when: string }[] = [];
-    if (flagged)
-      rows.push({
-        title: cls.code + " · " + DEMO_INSTRUCTOR.name + " asked to see you",
-        body: "Consultation hours: " + consultSummary(cls),
-        bg: C.amberTint,
-        color: C.amberText,
-        when: "Today",
-      });
-    live.upcoming.forEach((u) =>
-      rows.push({
-        title: cls.code + " · " + u.name + " · " + u.countdown,
-        body: u.notes || u.compPath + " · " + u.max + " points",
-        bg: "#FFFFFF",
-        color: C.ink,
-        when: u.mon + " " + u.day,
-      }),
-    );
-    live.missing.forEach((m) =>
-      rows.push({
-        title: cls.code + " · " + m + " recorded as missed",
-        body: "Ask " + DEMO_INSTRUCTOR.name + " about the make-up schedule.",
-        bg: C.redTint8,
-        color: C.redText,
-        when: "",
-      }),
-    );
-    if (live.remark)
-      rows.push({
-        title: cls.code + " · Remark from " + DEMO_INSTRUCTOR.name,
-        body: live.remark,
-        bg: "#FFFFFF",
-        color: C.ink,
-        when: "",
-      });
+    lives.forEach((x) => {
+      if (x.flagged)
+        rows.push({
+          title: x.code + " · " + x.instructor + " asked to see you",
+          body: "Consultation hours: " + x.consultText,
+          bg: C.amberTint,
+          color: C.amberText,
+          when: "Today",
+        });
+      x.upcoming.forEach((u) =>
+        rows.push({
+          title: x.code + " · " + u.name + " · " + u.countdown,
+          body: u.notes || u.compPath + " · " + u.max + " points",
+          bg: "#FFFFFF",
+          color: C.ink,
+          when: u.mon + " " + u.day,
+        }),
+      );
+      x.missing.forEach((m) =>
+        rows.push({
+          title: x.code + " · " + m + " recorded as missed",
+          body: "Ask " + x.instructor + " about the make-up schedule.",
+          bg: C.redTint8,
+          color: C.redText,
+          when: "",
+        }),
+      );
+      if (x.remark)
+        rows.push({
+          title: x.code + " · Remark from " + x.instructor,
+          body: x.remark,
+          bg: "#FFFFFF",
+          color: C.ink,
+          when: "",
+        });
+    });
     others.forEach((x) => {
       x.missing.forEach((m) =>
         rows.push({
@@ -186,13 +318,16 @@ export default function StudentScreen() {
         });
     });
     return rows;
-  }, [cls, live, others, flagged]);
+  }, [lives, others]);
 
+  // "Shared with your guardian" — the first live class's policy (account-level
+  // policy view comes with guardian management in the student app).
+  const gScopes = (main?.clsRef.guardianScopes ?? {}) as Record<string, boolean>;
   const share = [
     ["Grades", true],
     ["Attendance", true],
-    ["Missing work", true],
-    ["Remarks", false],
+    ["Missing work", gScopes["Missing work"] !== false],
+    ["Remarks", gScopes.Remarks === true],
   ].map(([k, on]) => ({ k: k as string, v: on ? "Shared" : "Hidden", color: on ? C.tealText : C.faint }));
 
   const tabs: TabDef<STab>[] = [
@@ -202,21 +337,43 @@ export default function StudentScreen() {
     { k: "me", label: "Me", icon: "me" },
   ];
   const title = { home: "Home", classes: "Class detail", alerts: "Alerts", me: "Profile" }[st.ptabS];
-  const periodHead = period + (periodClosed ? " · Final" : "");
   const sub =
     st.ptabS === "home"
-      ? sAll.length + " classes · " + period
+      ? sAll.length + (sAll.length === 1 ? " class" : " classes") + (mainPeriod ? " · " + mainPeriod : "")
       : st.ptabS === "classes"
-        ? sCls.code + " · " + sCls.title + " · " + period
+        ? sCls
+          ? sCls.code + " · " + sCls.title + (sClsLive ? " · " + sClsLive.period : "")
+          : "No classes yet"
         : st.ptabS === "alerts"
-          ? "All " + sAll.length + " classes"
-          : sr.name;
+          ? "All " + sAll.length + (sAll.length === 1 ? " class" : " classes")
+          : main?.rosterName || st.meName;
 
-  const weightedShare = live.c.groups.map((g, i) => ({
-    name: g.name,
-    w: g.shareW,
-    color: SEG_COLORS[i % 4],
-  }));
+  /* ---- no classes yet: everything funnels into the join card ---- */
+  if (sAll.length === 0)
+    return (
+      <PhoneShell title="Home" sub="Join your first class" tabBar={null}>
+        <Card style={{ gap: 0 }}>
+          <Text style={{ fontFamily: F.b400, fontSize: 13, color: C.sub }}>{greeting(fil)}</Text>
+          <Text style={{ fontFamily: F.d800, fontSize: 24, letterSpacing: -0.4, color: C.ink }}>
+            {first}
+          </Text>
+        </Card>
+        <JoinClassCard />
+        <PressableScale
+          scaleTo={0.98}
+          onPress={() => {
+            void doSignOut();
+            router.replace("/");
+          }}
+        >
+          <View style={s.signOut}>
+            <Text style={{ fontFamily: F.b700, fontSize: 13, color: C.redText }}>
+              {fil ? "Mag-sign out" : "Sign out"}
+            </Text>
+          </View>
+        </PressableScale>
+      </PhoneShell>
+    );
 
   return (
     <PhoneShell
@@ -241,7 +398,8 @@ export default function StudentScreen() {
                     {sFocus.code} · {sFocus.title}
                   </Text>
                   <Text style={{ fontFamily: F.b400, fontSize: 12, color: C.sub }}>
-                    {sFocus.instructor} · {period}
+                    {sFocus.instructor}
+                    {sFocusLive ? " · " + sFocusLive.period : ""}
                   </Text>
                 </View>
                 <Text style={{ fontFamily: F.d900, fontSize: 28, color: sFocus.color }}>
@@ -256,7 +414,7 @@ export default function StudentScreen() {
                   Attendance {sFocus.att}
                 </Text>
               </View>
-              {sFocus.live && (
+              {sFocusLive && (
                 <View
                   style={{
                     flexDirection: "row",
@@ -266,9 +424,14 @@ export default function StudentScreen() {
                     borderTopColor: C.hairline,
                   }}
                 >
-                  <Text style={{ fontFamily: F.b500, fontSize: 12, color: C.sub }}>{periodHead}</Text>
-                  <Text style={{ fontFamily: F.b700, fontSize: 12, color: term.color }}>
-                    {term.label} {term.pct === null ? "—" : term.grade + " · " + term.pctText}
+                  <Text style={{ fontFamily: F.b500, fontSize: 12, color: C.sub }}>
+                    {sFocusLive.period + (sFocusLive.periodClosed ? " · Final" : "")}
+                  </Text>
+                  <Text style={{ fontFamily: F.b700, fontSize: 12, color: sFocusLive.term.color }}>
+                    {sFocusLive.term.label}{" "}
+                    {sFocusLive.term.pct === null
+                      ? "—"
+                      : sFocusLive.term.grade + " · " + sFocusLive.term.pctText}
                   </Text>
                 </View>
               )}
@@ -336,22 +499,22 @@ export default function StudentScreen() {
             })}
           </ScrollView>
 
-          {sCls.live ? (
+          {sClsLive ? (
             <>
               <Card style={{ padding: 18, gap: 14 }}>
                 <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
                   <View style={{ gap: 6 }}>
                     <Text style={{ fontFamily: F.b600, fontSize: 13, color: C.sub }}>
-                      Your standing · {periodHead}
+                      Your standing · {sClsLive.period + (sClsLive.periodClosed ? " · Final" : "")}
                     </Text>
-                    <Chip text={live.chipPlain} bg={live.bg} color={live.color} />
+                    <Chip text={sClsLive.chipPlain} bg={sClsLive.bg} color={sClsLive.color} />
                   </View>
-                  <Text style={{ fontFamily: F.d900, fontSize: 48, letterSpacing: -2, lineHeight: 52, color: live.color }}>
-                    {live.grade}
+                  <Text style={{ fontFamily: F.d900, fontSize: 48, letterSpacing: -2, lineHeight: 52, color: sClsLive.color }}>
+                    {sClsLive.grade}
                   </Text>
                 </View>
                 <View style={{ flexDirection: "row", gap: 6 }}>
-                  {strip.map((p, i) => (
+                  {sClsLive.strip.map((p, i) => (
                     <View
                       key={i}
                       style={{
@@ -373,39 +536,39 @@ export default function StudentScreen() {
                   ))}
                 </View>
                 <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-                  <Text style={{ fontFamily: F.b600, fontSize: 13, color: C.sub }}>{term.label}</Text>
-                  <Text style={{ fontFamily: F.b600, fontSize: 13, color: term.color }}>
-                    {term.pct === null ? "—" : term.grade + " · " + term.pctText}
+                  <Text style={{ fontFamily: F.b600, fontSize: 13, color: C.sub }}>{sClsLive.term.label}</Text>
+                  <Text style={{ fontFamily: F.b600, fontSize: 13, color: sClsLive.term.color }}>
+                    {sClsLive.term.pct === null ? "—" : sClsLive.term.grade + " · " + sClsLive.term.pctText}
                   </Text>
                 </View>
                 <View style={{ gap: 6 }}>
                   <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
                     <Text style={{ fontFamily: F.b700, fontSize: 13, color: C.ink }}>Weighted total</Text>
-                    <Text style={{ fontFamily: F.b700, fontSize: 13, color: live.color }}>{live.pct}</Text>
+                    <Text style={{ fontFamily: F.b700, fontSize: 13, color: sClsLive.color }}>{sClsLive.pct}</Text>
                   </View>
                   <View style={{ position: "relative", height: 12, borderRadius: 999, backgroundColor: C.line, overflow: "hidden", flexDirection: "row" }}>
-                    {live.c.groups.map((g, i) => (
+                    {sClsLive.c.groups.map((g, i) => (
                       <View key={i} style={{ height: "100%", width: `${g.share}%`, backgroundColor: SEG_COLORS[i % 4] }} />
                     ))}
-                    <View style={{ position: "absolute", top: 0, bottom: 0, width: 2, backgroundColor: C.ink, left: `${passing}%` }} />
+                    <View style={{ position: "absolute", top: 0, bottom: 0, width: 2, backgroundColor: C.ink, left: `${sClsLive.passing}%` }} />
                   </View>
                   <View style={{ flexDirection: "row", justifyContent: "space-between", flexWrap: "wrap", gap: 4 }}>
                     <View style={{ flexDirection: "row", gap: 10, flexWrap: "wrap" }}>
-                      {weightedShare.map((g, i) => (
+                      {sClsLive.c.groups.map((g, i) => (
                         <View key={i} style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
-                          <View style={{ width: 8, height: 8, borderRadius: 999, backgroundColor: g.color }} />
+                          <View style={{ width: 8, height: 8, borderRadius: 999, backgroundColor: SEG_COLORS[i % 4] }} />
                           <Text style={{ fontFamily: F.b500, fontSize: 12, color: C.sub }}>
-                            {g.name} {g.w}
+                            {g.name} {g.shareW}
                           </Text>
                         </View>
                       ))}
                     </View>
-                    <Text style={{ fontFamily: F.b500, fontSize: 12, color: C.sub }}>Passing {passing}%</Text>
+                    <Text style={{ fontFamily: F.b500, fontSize: 12, color: C.sub }}>Passing {sClsLive.passing}%</Text>
                   </View>
                 </View>
               </Card>
 
-              {live.c.groups.map((g, gi) => (
+              {sClsLive.c.groups.map((g, gi) => (
                 <Card key={gi} style={{ gap: 12 }}>
                   <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "baseline" }}>
                     <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
@@ -445,30 +608,30 @@ export default function StudentScreen() {
                 </Card>
               ))}
 
-              {live.upcoming.length > 0 && (
+              {sClsLive.upcoming.length > 0 && (
                 <Card style={{ gap: 10 }}>
                   <SectionTitle>Upcoming</SectionTitle>
-                  {live.upcoming.map((u, i) => (
+                  {sClsLive.upcoming.map((u, i) => (
                     <UpcomingRow key={i} u={u} />
                   ))}
                 </Card>
               )}
 
-              {flagged ? (
+              {sClsLive.flagged ? (
                 <View style={{ backgroundColor: C.amberTint, borderRadius: 20, paddingHorizontal: 18, paddingVertical: 14, gap: 4 }}>
                   <Text style={{ fontFamily: F.d800, fontSize: 14, color: C.amberText }}>
-                    {DEMO_INSTRUCTOR.name} asked to see you
+                    {sClsLive.instructor} asked to see you
                   </Text>
                   <Text style={{ fontFamily: F.b400, fontSize: 13, color: C.ink, lineHeight: 19 }}>
-                    Consultation hours: {consultSummary(cls)}
+                    Consultation hours: {sClsLive.consultText}
                   </Text>
                 </View>
               ) : (
-                hasHours && (
+                sClsLive.hasHours && (
                   <Card style={{ paddingVertical: 14, gap: 4 }}>
                     <Text style={{ fontFamily: F.b600, fontSize: 14, color: C.ink }}>Consultation hours</Text>
                     <Text style={{ fontFamily: F.b400, fontSize: 13, color: C.sub, lineHeight: 19 }}>
-                      {consultSummary(cls)}
+                      {sClsLive.consultText}
                     </Text>
                   </Card>
                 )
@@ -478,24 +641,24 @@ export default function StudentScreen() {
                 <Text style={{ fontFamily: F.b600, fontSize: 14, color: C.ink }}>
                   Attendance{" "}
                   <Text style={{ fontFamily: F.b500, fontSize: 12, color: C.sub }}>
-                    {cls.sessions.length
-                      ? cls.sessions.filter((x) => (x.marks[sr.id] || "P") !== "A").length +
+                    {sClsLive.clsRef.sessions.length
+                      ? sClsLive.clsRef.sessions.filter((x) => (x.marks[sClsLive.sid] || "P") !== "A").length +
                         " of " +
-                        cls.sessions.length +
+                        sClsLive.clsRef.sessions.length +
                         " sessions"
                       : "no sessions yet"}
                   </Text>
                 </Text>
-                <Text style={{ fontFamily: F.d800, fontSize: 15, color: live.attColor }}>{live.att}</Text>
+                <Text style={{ fontFamily: F.d800, fontSize: 15, color: sClsLive.attColor }}>{sClsLive.att}</Text>
               </Card>
 
-              {!!live.remark && (
+              {!!sClsLive.remark && (
                 <View style={s.dashedBox}>
                   <Text style={{ fontFamily: F.b700, fontSize: 13, color: C.sub }}>
-                    Remark from {DEMO_INSTRUCTOR.name}
+                    Remark from {sClsLive.instructor}
                   </Text>
                   <Text style={{ fontFamily: F.b400, fontSize: 14, color: C.ink, marginTop: 4 }}>
-                    {live.remark}
+                    {sClsLive.remark}
                   </Text>
                 </View>
               )}
@@ -506,7 +669,7 @@ export default function StudentScreen() {
                 <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
                   <View style={{ gap: 6 }}>
                     <Text style={{ fontFamily: F.b600, fontSize: 13, color: C.sub }}>
-                      Your standing · {period}
+                      Your standing{mainPeriod ? " · " + mainPeriod : ""}
                     </Text>
                     <Chip text={sCls.chipPlain} bg={sCls.bg} color={sCls.color} />
                   </View>
@@ -604,16 +767,22 @@ export default function StudentScreen() {
             <View style={s.avatar}>
               <Text style={{ fontFamily: F.d800, fontSize: 22, color: "#FFFFFF" }}>{first}</Text>
             </View>
-            <Text style={{ fontFamily: F.d800, fontSize: 18, color: C.ink }}>{sr.name}</Text>
-            <Text style={{ fontFamily: F.b400, fontSize: 13, color: C.sub }}>{cls.section}</Text>
+            <Text style={{ fontFamily: F.d800, fontSize: 18, color: C.ink }}>
+              {main?.rosterName || st.meName}
+            </Text>
+            <Text style={{ fontFamily: F.b400, fontSize: 13, color: C.sub }}>
+              {main?.section || st.email}
+            </Text>
           </Card>
           <Card style={{ gap: 0 }}>
-            {[
-              ["Student no.", sr.no],
-              ["Section", cls.section],
-              ["Guardian", "Lorna Reyes · Mother"],
-              ["Sharing", "Set by class · 3 of 4 scopes"],
-            ].map(([k, v], i) => (
+            {(
+              [
+                ["Student no.", main?.no || "—"],
+                ["Section", main?.section || "—"],
+                ...(isDemo ? ([["Guardian", "Lorna Reyes · Mother"]] as [string, string][]) : []),
+                ["Sharing", "Set by class · " + share.filter((r) => r.v === "Shared").length + " of 4 scopes"],
+              ] as [string, string][]
+            ).map(([k, v], i, arr) => (
               <View
                 key={i}
                 style={{
@@ -621,7 +790,7 @@ export default function StudentScreen() {
                   justifyContent: "space-between",
                   gap: 12,
                   paddingVertical: 8,
-                  borderBottomWidth: i === 3 ? 0 : 1,
+                  borderBottomWidth: i === arr.length - 1 ? 0 : 1,
                   borderBottomColor: C.hairline,
                 }}
               >
@@ -646,7 +815,13 @@ export default function StudentScreen() {
               shares with them under its own policy.
             </Text>
           </Card>
-          <PressableScale scaleTo={0.98} onPress={() => router.back()}>
+          <PressableScale
+            scaleTo={0.98}
+            onPress={() => {
+              void doSignOut();
+              router.replace("/");
+            }}
+          >
             <View style={s.signOut}>
               <Text style={{ fontFamily: F.b700, fontSize: 13, color: C.redText }}>
                 {fil ? "Mag-sign out" : "Sign out"}

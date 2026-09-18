@@ -98,6 +98,14 @@ async function adopt(a: AuthResponse): Promise<AuthResponse> {
 export const signIn = async (email: string, password: string) =>
   adopt((await api.post("/auth/login", { email, password })) as AuthResponse);
 
+export const register = async (b: {
+  email: string;
+  password: string;
+  role: "student" | "guardian";
+  first?: string;
+  last?: string;
+}) => adopt((await api.post("/auth/register", b)) as AuthResponse);
+
 /** Re-mint tokens from the stored refresh token. Null = no/expired session. */
 export async function resume(): Promise<AuthResponse | null> {
   const refresh = await readRefresh();
@@ -136,3 +144,35 @@ export async function loadAll() {
 }
 
 export const saveProfile = (profile: unknown) => api.patch("/auth/me", { profile });
+
+export interface StudentClassRow {
+  class: Klass;
+  studentRowId: string;
+  studentName: string;
+  instructor: string;
+}
+
+export interface GuardianChild {
+  name: string;
+  role: string;
+  classes: { class: Klass; studentRowId: string; instructor: string; scopes: string[] }[];
+}
+
+export const me = () =>
+  api.get("/auth/me") as Promise<{
+    user: { email: string; role: string; profile: MeProfile };
+    entitlement: EntitlementDto;
+  }>;
+
+export const studentClasses = async () =>
+  ((await api.get("/student/classes")) as { classes: StudentClassRow[] }).classes;
+
+export const guardianChildren = async () =>
+  ((await api.get("/guardian/children")) as { children: GuardianChild[] }).children;
+
+/** Student joins a class by join code + student number or name. */
+export const joinClass = (code: string, opts: { studentNo?: string; name?: string }) =>
+  api.post("/join", { code, ...opts });
+
+/** Guardian claims an invite code from the instructor. */
+export const claimInvite = (code: string) => api.post("/guardian/claim", { code });

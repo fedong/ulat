@@ -1,9 +1,22 @@
 "use client";
 
-import { use } from "react";
-import { CONSENTS_RAW, DEFAULT_GUARDIAN_SCOPES, ROLE_COLORS, SCOPES } from "@/lib/consents";
+import { use, useCallback, useEffect, useState } from "react";
+import { api } from "@/lib/api";
+import { DEFAULT_GUARDIAN_SCOPES, ROLE_COLORS, SCOPES } from "@/lib/consents";
 import { useClass, useUlat } from "@/lib/store";
 import type { GuardianRole } from "@/lib/types";
+
+interface GuardianRow {
+  id: string;
+  name: string;
+  role: GuardianRole;
+  contact: string;
+  status: "invited" | "active";
+  code?: string;
+  date: string;
+}
+
+type SharingState = Record<string, { enrolled: boolean; guardians: GuardianRow[] }>;
 
 const HOW_IT_WORKS: [string, React.ReactNode][] = [
   [
@@ -27,13 +40,27 @@ export default function SharingPage({ params }: { params: Promise<{ clsId: strin
   const { clsId } = use(params);
   const st = useUlat();
   const cls = useClass(clsId);
+
+  // Live sharing state: enrollments + guardian links per student.
+  const [sharing, setSharing] = useState<SharingState>({});
+  const refresh = useCallback(async () => {
+    try {
+      const r = (await api.get(`/api/v1/classes/${clsId}/guardians`)) as {
+        students: SharingState;
+      };
+      setSharing(r.students);
+    } catch {}
+  }, [clsId]);
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
+
   if (!cls) return null;
   const roster = cls.roster;
 
-  const toast = (msg: string) =>
-    st.confirm({ title: "Sent", body: msg, confirmLabel: "OK", onConfirm: () => {} });
+  const toast = (msg: string, title = "Sent") =>
+    st.confirm({ title, body: msg, confirmLabel: "OK", onConfirm: () => {} });
 
-  const today = new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
   const linkOk =
     st.linkName.trim().length > 1 &&
     (/\S+@\S+\.\S+/.test(st.linkContact) || st.linkContact.replace(/\D/g, "").length >= 10);
@@ -58,34 +85,29 @@ export default function SharingPage({ params }: { params: Promise<{ clsId: strin
     };
   });
 
-  const consents = roster.map((r, i) => {
-    const [gRaw, , date0, status0] = CONSENTS_RAW[i % CONSENTS_RAW.length];
-    const mkContact = (j: number) =>
-      "+63 9" + String(17 + i + j).padStart(2, "0") + " " +
-      String(200 + i * 37 + j * 11).padStart(3, "0") + " " +
-      String(1000 + i * 913 + j * 71).slice(-4);
-    const linked =
-      status0 === "Active"
-        ? gRaw.split("|").map((s, j) => {
-            const [name, role] = s.split(" · ");
-            return { name, role: role as GuardianRole, contact: mkContact(j), pending: false, date: undefined as string | undefined };
-          })
-        : [];
-    const invited = (st.links[r.id] || []).map((p) => ({
-      name: p.name,
-      role: p.role,
-      contact: p.contact,
-      pending: true,
-      date: p.date as string | undefined,
-    }));
+  const fmtDate = (iso: string) =>
+    new Date(iso + "T00:00:00").toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+
+  const consents = roster.map((r) => {
+    const row = sharing[r.id] || { enrolled: false, guardians: [] };
+    const linked = row.guardians.filter((g) => g.status === "active");
+    const invited = row.guardians.filter((g) => g.status === "invited");
     const guardians = [...linked, ...invited].map((g) => {
       const [roleBg, roleColor] = ROLE_COLORS[g.role] || ROLE_COLORS.Guardian;
-      return { ...g, roleBg, roleColor };
+      return { ...g, pending: g.status === "invited", roleBg, roleColor };
     });
     const nLinked = linked.length;
     const nPending = invited.length;
     const status = nLinked ? "Linked" + (nLinked > 1 ? " · " + nLinked : "") : nPending ? "Pending" : "Not linked";
-    const date = nLinked ? date0 : nPending ? "Invited " + invited[0].date : "—";
+    const date = nLinked
+      ? fmtDate(linked[0].date)
+      : nPending
+        ? "Invited " + fmtDate(invited[0].date)
+        : "—";
     const wasNudged = !!st.nudged[r.id];
     const first = r.name.split(",")[1].trim().split(" ")[0];
     const open = st.linkFor === r.id;
@@ -93,6 +115,7 @@ export default function SharingPage({ params }: { params: Promise<{ clsId: strin
       id: r.id,
       name: r.name,
       first,
+      enrolled: row.enrolled,
       guardians,
       date,
       status,
@@ -125,20 +148,29 @@ export default function SharingPage({ params }: { params: Promise<{ clsId: strin
       sendLink: () => {
         if (!linkOk) return;
         const name = st.linkName.trim();
-        st.set({
-          links: {
-            ...st.links,
-            [r.id]: [
-              ...(st.links[r.id] || []),
-              { name, contact: st.linkContact.trim(), role: st.linkRole, date: today },
-            ],
-          },
-          linkFor: null,
-          linkName: "",
-          linkContact: "",
-          linkRole: "Mother",
-        });
-        toast("Invite sent to " + name + ". Sharing starts as soon as they register.");
+        void (async () => {
+          try {
+            const res = (await api.post(`/api/v1/classes/${clsId}/guardians`, {
+              studentRowId: r.id,
+              name,
+              contact: st.linkContact.trim(),
+              role: st.linkRole,
+            })) as { code: string };
+            st.set({ linkFor: null, linkName: "", linkContact: "", linkRole: "Mother" });
+            await refresh();
+            toast(
+              name +
+                " signs in to the Ulat app as a guardian and enters the code " +
+                res.code +
+                " to start following " +
+                first +
+                ". Share it with them directly for now — invites by SMS/email arrive with notifications.",
+              "Invite created — code " + res.code,
+            );
+          } catch {
+            toast("Couldn't create the invite. Check your connection and try again.", "Something went wrong");
+          }
+        })();
       },
     };
   });
@@ -215,7 +247,14 @@ export default function SharingPage({ params }: { params: Promise<{ clsId: strin
                 className="grid min-h-[50px] items-center gap-2 px-[18px] py-2.5 text-sm font-medium"
                 style={{ gridTemplateColumns: gridCols }}
               >
-                <span className="font-semibold">{c.name}</span>
+                <span className="min-w-0">
+                  <span className="font-semibold">{c.name}</span>
+                  {c.enrolled && (
+                    <span className="ml-1.5 whitespace-nowrap rounded-full bg-teal-tint-12 px-2 py-0.5 text-[11px] font-semibold text-teal-text">
+                      on Ulat
+                    </span>
+                  )}
+                </span>
                 <span className="flex flex-col gap-2">
                   {c.guardians.length === 0 && <span className="text-faint">—</span>}
                   {c.guardians.map((g, j) => (
@@ -323,9 +362,9 @@ export default function SharingPage({ params }: { params: Promise<{ clsId: strin
                     </button>
                   </div>
                   <div className="text-xs leading-[1.5] text-sub">
-                    The guardian gets a one-time link to register or sign in. Once they confirm{" "}
-                    {c.first}&apos;s student number, grades and attendance are shared right away
-                    and {c.first} is notified.
+                    You&apos;ll get a one-time code to pass to the guardian. They register or sign
+                    in on the Ulat app, enter it, and {c.first}&apos;s grades and attendance are
+                    shared right away under this class&apos;s policy.
                   </div>
                 </div>
               )}

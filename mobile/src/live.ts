@@ -34,7 +34,12 @@ export function currentPeriodOf(cls: Klass, studentId: string): string {
   return open[open.length - 1] || graded[graded.length - 1] || cls.periods[0];
 }
 
-export function buildLive(cls: Klass, studentId: string) {
+export interface LiveOpts {
+  instructor?: string;
+  scopes?: string[];
+}
+
+export function buildLive(cls: Klass, studentId: string, opts: LiveOpts = {}) {
   const gs = cls.grading;
   const period = currentPeriodOf(cls, studentId);
 
@@ -77,7 +82,7 @@ export function buildLive(cls: Klass, studentId: string) {
     live: true,
     code: cls.code,
     title: cls.title,
-    instructor: DEMO_INSTRUCTOR.name,
+    instructor: opts.instructor || DEMO_INSTRUCTOR.name,
     grade: c.grade,
     k: c.k,
     pct: c.pctText,
@@ -90,7 +95,7 @@ export function buildLive(cls: Klass, studentId: string) {
     missing: c.missing.map((a) => a.name),
     upcoming,
     remark: cls.remarks[studentId] || "",
-    scopes: ["Grades", "Attendance", "Missing work"],
+    scopes: opts.scopes || ["Grades", "Attendance", "Missing work"],
     status: "Active",
   };
   return { live, term, strip, period, computed: c };

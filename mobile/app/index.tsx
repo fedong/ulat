@@ -74,13 +74,13 @@ export default function Onboarding() {
     {
       title: "I'm a student",
       sub: "See your standing, upcoming work and remarks",
-      href: "/student",
+      href: "/signin?role=student",
       icon: "me",
     },
     {
       title: "I'm a guardian",
       sub: "Follow your children across their classes",
-      href: "/guardian",
+      href: "/signin?role=guardian",
       icon: "kids",
     },
   ];
