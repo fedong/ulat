@@ -8,8 +8,23 @@ the unit Coolify deploys.
 
 ## 1 · Server
 
-- Hetzner Cloud **CX33** (or larger), **Singapore**, Ubuntu 24.04 LTS.
+Any Ubuntu 24.04 LTS VPS with ≥ 4 vCPU / 8 GB works — the stack is plain
+Docker, nothing provider-specific. Pick by price near the Philippines:
+
+- **Recommended: a Singapore-region VPS** — OVHcloud (~S$8–15/mo for the 8 GB
+  tier; check the renewal price) or Contabo (~€8/mo incl. their Singapore
+  location fee). ~30–50 ms from the Philippines.
+- Hetzner (the original pick) is only cheap in its EU/US regions — its
+  Singapore location offers dedicated-only at several times the price. An EU
+  Hetzner box (~€7–14/mo) also works; the clients' optimistic sync tolerates
+  the ~280 ms, but Singapore feels snappier.
+
+Then, whichever box:
+
+- Add your SSH key at creation (no root password), enable the provider's
+  backup add-on if offered.
 - Install Coolify (their one-liner): `curl -fsSL https://cdn.coollabs.io/coolify/install.sh | bash`
+  — and open `http://SERVER-IP:8000` immediately to claim the admin account.
 - Basic hardening: SSH keys only, `ufw` allowing 22/80/443 (+ 8000 for the
   Coolify UI until it sits behind a domain), unattended-upgrades on.
 
