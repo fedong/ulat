@@ -165,9 +165,11 @@ export default function ClassLayout({ children }: { children: React.ReactNode })
         </div>
 
         <div className="mx-2 mb-2 mt-8 flex items-center justify-between">
-          <span className="text-[11px] font-bold tracking-[1.2px] text-muted">CLASSES</span>
+          <span className="text-[11px] font-bold tracking-[1.2px] text-muted">
+            {L("CLASSES", "MGA KLASE")}
+          </span>
           <button onClick={newClass} className="cursor-pointer p-0 text-xs font-bold text-amber">
-            + New
+            {L("+ New", "+ Bago")}
           </button>
         </div>
         <div data-tour="classes" className="flex flex-col gap-1">
@@ -193,7 +195,10 @@ export default function ClassLayout({ children }: { children: React.ReactNode })
               onClick={() => st.set({ showArchived: !st.showArchived })}
               className="cursor-pointer px-3 pb-0.5 pt-2 text-left text-xs font-semibold text-muted hover:text-canvas"
             >
-              {(st.showArchived ? "Hide" : "Show") + " archived (" + archivedCls.length + ")"}
+              {L(
+                (st.showArchived ? "Hide" : "Show") + " archived (" + archivedCls.length + ")",
+                (st.showArchived ? "Itago" : "Ipakita") + " ang naka-archive (" + archivedCls.length + ")",
+              )}
             </button>
           )}
           {st.showArchived &&
@@ -215,7 +220,7 @@ export default function ClassLayout({ children }: { children: React.ReactNode })
         </div>
 
         <div className="mx-2 mb-2 mt-7 text-[11px] font-bold tracking-[1.2px] text-muted">
-          THIS CLASS
+          {L("THIS CLASS", "ANG KLASENG ITO")}
         </div>
         <div data-tour="nav" className="flex flex-col gap-0.5">
           {PAGES.map(([p, label]) => {
@@ -264,7 +269,9 @@ export default function ClassLayout({ children }: { children: React.ReactNode })
                   animation: "ulatPulse 2.4s ease-out infinite",
                 }}
               />
-              {st.saved ? "All changes saved · students see them now" : "Saving…"}
+              {st.saved
+                ? L("All changes saved · students see them now", "Naka-save lahat · kita na ng mga estudyante")
+                : L("Saving…", "Sine-save…")}
             </span>
             <ExportMenu clsId={cls.id} />
             <button

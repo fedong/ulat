@@ -8,14 +8,17 @@ import type { GuardianRole } from "./types";
  */
 export type ConsentRow = [string, string[], string, string];
 
+// Ordered to pair with the CS101 roster (Aquino, Bautista, Dela Cruz, …) so
+// each guardian's surname matches their child; Ana Reyes's mother Lorna is
+// the same guardian the mobile app demos.
 export const CONSENTS_RAW: ConsentRow[] = [
-  ["Lorna Reyes · Mother", ["Grades", "Attendance", "Missing work"], "Aug 22, 2026", "Active"],
   ["Rosa Aquino · Mother|Carlos Aquino · Father", ["Grades", "Attendance", "Missing work", "Remarks"], "Aug 19, 2026", "Active"],
   ["Ernesto Bautista · Father", ["Grades"], "Aug 20, 2026", "Active"],
   ["—", [], "—", "Not linked"],
   ["Teresa Garcia · Mother", ["Grades", "Attendance"], "Aug 23, 2026", "Active"],
   ["Ben Mendoza · Guardian", ["Grades", "Missing work"], "Aug 25, 2026", "Active"],
   ["Lita Ramos · Mother", ["Grades", "Attendance", "Missing work"], "Aug 18, 2026", "Active"],
+  ["Lorna Reyes · Mother", ["Grades", "Attendance", "Missing work"], "Aug 22, 2026", "Active"],
   ["Marites Santos · Mother", ["Grades", "Attendance", "Missing work", "Remarks"], "Aug 21, 2026", "Active"],
   ["—", [], "—", "Not linked"],
   ["Jun Villanueva · Father", ["Grades", "Attendance"], "Aug 27, 2026", "Active"],

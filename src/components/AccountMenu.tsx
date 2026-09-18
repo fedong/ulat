@@ -113,8 +113,8 @@ export function AccountMenu({ clsId }: { clsId: string }) {
                   color: page === k ? "#FFFFFF" : "#E6EBEE",
                 }}
               >
-                <span>{label}</span>
-                <span className="max-w-[130px] truncate text-[11px] font-medium text-muted">
+                <span className="whitespace-nowrap">{label}</span>
+                <span className="max-w-[110px] truncate text-[11px] font-medium text-muted">
                   {hint}
                 </span>
               </button>
