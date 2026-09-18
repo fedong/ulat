@@ -33,6 +33,7 @@ import {
   BackPill,
   Card,
   Chip,
+  FocusInput,
   PhoneShell,
   PressableScale,
   PrimaryButton,
@@ -105,11 +106,6 @@ export default function InstructorScreen() {
     () => cls.assessments.filter((a) => a.period === st.period),
     [cls, st.period],
   );
-  const computed = useMemo(
-    () => Object.fromEntries(roster.map((r) => [r.id, compute(cls, gs, r.id, null, asmsP)])),
-    [cls, gs, roster, asmsP],
-  );
-
   const gradedOf = (a: Assessment) =>
     roster.filter((r) => {
       const v = (cls.scores[r.id] || {})[a.id];
@@ -240,12 +236,31 @@ export default function InstructorScreen() {
     st.set({ phoneSession: next.findIndex((s) => s.date === todayIso() && (s.group || null) === gid) });
   };
 
-  /* ---- alerts (needs attention) ---- */
+  /* ---- alerts (needs attention) — always on the class's live period, not
+     the Grades filter the instructor last browsed ---- */
   const passing = Number(gs.passing) || 0;
+  const livePeriod = useMemo(() => {
+    const graded = periods.filter((p) =>
+      cls.assessments.some(
+        (a) =>
+          a.period === p &&
+          roster.some((r) => {
+            const v = (cls.scores[r.id] || {})[a.id];
+            return v !== undefined && v !== null;
+          }),
+      ),
+    );
+    const open = graded.filter((p) => !closedP[p]);
+    return open[open.length - 1] || graded[graded.length - 1] || periods[0];
+  }, [cls, periods, roster, closedP]);
+  const liveComputed = useMemo(() => {
+    const asmsLive = cls.assessments.filter((a) => a.period === livePeriod);
+    return Object.fromEntries(roster.map((r) => [r.id, compute(cls, gs, r.id, null, asmsLive)]));
+  }, [cls, gs, roster, livePeriod]);
   const watch = useMemo(() => {
     const order: Record<string, number> = { fail: 0, inc: 1, risk: 2 };
     return roster
-      .map((r) => ({ r, c: computed[r.id] }))
+      .map((r) => ({ r, c: liveComputed[r.id] }))
       .filter((x) => x.c.k !== "pass")
       .sort((a, b) => order[a.c.k] - order[b.c.k] || (a.c.pct || 0) - (b.c.pct || 0))
       .map((x) => {
@@ -270,7 +285,7 @@ export default function InstructorScreen() {
           why: out.join(" · ") || "Close to the passing line",
         };
       });
-  }, [roster, computed, cls, passing]);
+  }, [roster, liveComputed, cls, passing]);
   const flagged = Object.keys(cls.flags || {})
     .filter((k) => (cls.flags || {})[k])
     .map((id) => roster.find((r) => r.id === id))
@@ -386,11 +401,10 @@ export default function InstructorScreen() {
           <Card style={{ gap: 14 }}>
             <View style={{ gap: 6 }}>
               <Text style={s.label}>NAME</Text>
-              <TextInput
+              <FocusInput
                 value={st.na.name}
                 onChangeText={(t) => st.set({ na: { ...st.na, name: t } })}
                 placeholder={naSuggest}
-                placeholderTextColor={C.faint}
                 style={s.input}
               />
             </View>
@@ -431,7 +445,7 @@ export default function InstructorScreen() {
             <View style={{ flexDirection: "row", gap: 10 }}>
               <View style={{ flex: 1, gap: 6, minWidth: 0 }}>
                 <Text style={s.label}>MAX SCORE</Text>
-                <TextInput
+                <FocusInput
                   value={st.na.max}
                   onChangeText={(t) => st.set({ na: { ...st.na, max: t } })}
                   inputMode="decimal"
@@ -468,12 +482,32 @@ export default function InstructorScreen() {
             </View>
             {st.na.later && (
               <View style={{ gap: 6 }}>
-                <Text style={s.label}>DATE (YYYY-MM-DD)</Text>
-                <TextInput
+                <Text style={s.label}>DATE</Text>
+                <View style={{ flexDirection: "row", gap: 6 }}>
+                  {(
+                    [
+                      ["Tomorrow", 1],
+                      ["+3 days", 3],
+                      ["Next week", 7],
+                    ] as const
+                  ).map(([label, days]) => {
+                    const iso = new Date(Date.now() + days * 864e5).toISOString().slice(0, 10);
+                    const on = st.na.date === iso;
+                    return (
+                      <Pressable
+                        key={label}
+                        onPress={() => st.set({ na: { ...st.na, date: iso } })}
+                        style={[s.chipBtn, on && s.chipBtnOn]}
+                      >
+                        <Text style={[s.chipBtnText, on && { color: "#FFFFFF" }]}>{label}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+                <FocusInput
                   value={st.na.date}
                   onChangeText={(t) => st.set({ na: { ...st.na, date: t } })}
-                  placeholder="2026-09-25"
-                  placeholderTextColor={C.faint}
+                  placeholder="YYYY-MM-DD"
                   style={s.input}
                 />
               </View>
@@ -482,11 +516,10 @@ export default function InstructorScreen() {
               <Text style={s.label}>
                 COVERAGE AND REMINDERS <Text style={{ fontFamily: F.b500 }}>· shown to students</Text>
               </Text>
-              <TextInput
+              <FocusInput
                 value={st.na.notes}
                 onChangeText={(t) => st.set({ na: { ...st.na, notes: t } })}
                 placeholder="e.g. Chapters 3–5, bring a calculator. Room B-301."
-                placeholderTextColor={C.faint}
                 multiline
                 numberOfLines={2}
                 style={[s.input, { height: 64, paddingTop: 10, textAlignVertical: "top" }]}
@@ -586,8 +619,11 @@ export default function InstructorScreen() {
         <>
           <BackPill label="All assessments" onPress={() => st.set({ phoneAsmId: null })} />
           <Card style={{ gap: 8 }}>
-            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "baseline", gap: 10 }}>
-              <Text style={{ fontFamily: F.d800, fontSize: 17, color: C.ink }}>{pa.name}</Text>
+            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8, flexShrink: 1 }}>
+                <Text style={{ fontFamily: F.d800, fontSize: 17, color: C.ink }}>{pa.name}</Text>
+                {periodClosed && <Chip text="Final" bg={C.incTint} color={C.sub} />}
+              </View>
               <Text style={{ fontFamily: F.b700, fontSize: 13, color: C.tealText }}>
                 {Math.round((paGraded / Math.max(1, roster.length)) * 100)}%
               </Text>
@@ -654,19 +690,13 @@ export default function InstructorScreen() {
                         {pct}%
                       </Text>
                     )}
-                    {periodClosed && (
-                      <Text style={{ fontFamily: F.b700, fontSize: 11, color: C.sub, marginTop: 2 }}>
-                        Final
-                      </Text>
-                    )}
                   </View>
-                  <TextInput
+                  <FocusInput
                     key={pa.id + r.id + String(v)}
                     defaultValue={typeof v === "number" ? String(v) : ""}
                     editable={!periodClosed}
                     inputMode="decimal"
                     placeholder={special ? (v === "MISSED" ? "M" : "E") : "—"}
-                    placeholderTextColor={C.faint}
                     onEndEditing={(e) => {
                       const raw = e.nativeEvent.text.trim();
                       if (raw === "") return putScore(r.id, null);
@@ -675,7 +705,14 @@ export default function InstructorScreen() {
                       const n = parseFloat(raw);
                       if (!isNaN(n)) putScore(r.id, Math.max(0, Math.min(Number(pa.max), n)));
                     }}
-                    style={s.scoreInput}
+                    style={[
+                      s.scoreInput,
+                      periodClosed && {
+                        backgroundColor: C.canvas,
+                        borderColor: C.hairline,
+                        color: C.sub,
+                      },
+                    ]}
                   />
                 </View>
               );
@@ -923,20 +960,20 @@ export default function InstructorScreen() {
             </View>
             <Text style={{ fontFamily: F.d800, fontSize: 18, color: C.ink }}>{DEMO_INSTRUCTOR.name}</Text>
             <Text style={{ fontFamily: F.b400, fontSize: 13, color: C.sub }}>
-              {DEMO_INSTRUCTOR.email} · {activeCls.length} classes
+              {DEMO_INSTRUCTOR.email} · {activeCls.length} {fil ? "klase" : "classes"}
             </Text>
           </Card>
           <Card style={{ gap: 8 }}>
-            <SectionTitle>Consultation hours</SectionTitle>
+            <SectionTitle>{fil ? "Oras ng konsultasyon" : "Consultation hours"}</SectionTitle>
             <Text style={{ fontFamily: F.b400, fontSize: 13, color: C.sub, lineHeight: 19 }}>
               {consultSummary(cls)}
             </Text>
             <Text style={{ fontFamily: F.b400, fontSize: 12, color: C.sub }}>
-              Managed in Settings on the web.
+              {fil ? "Pinamamahalaan sa Settings sa web." : "Managed in Settings on the web."}
             </Text>
           </Card>
           <Card style={{ gap: 8 }}>
-            <SectionTitle>Language</SectionTitle>
+            <SectionTitle>{fil ? "Wika" : "Language"}</SectionTitle>
             <View style={s.segWrap}>
               {(["English", "Filipino"] as const).map((l) => {
                 const on = st.lang === l;
@@ -948,9 +985,13 @@ export default function InstructorScreen() {
               })}
             </View>
           </Card>
-          <Pressable onPress={() => router.back()} style={s.signOut}>
-            <Text style={{ fontFamily: F.b700, fontSize: 13, color: C.redText }}>Sign out</Text>
-          </Pressable>
+          <PressableScale scaleTo={0.98} onPress={() => router.back()}>
+            <View style={s.signOut}>
+              <Text style={{ fontFamily: F.b700, fontSize: 13, color: C.redText }}>
+                {fil ? "Mag-sign out" : "Sign out"}
+              </Text>
+            </View>
+          </PressableScale>
         </>
       )}
     </PhoneShell>

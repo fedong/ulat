@@ -389,9 +389,13 @@ export default function GuardianScreen() {
               upcoming work beats a long talk after grades close.
             </Text>
           </Card>
-          <Pressable onPress={() => router.back()} style={s.signOut}>
-            <Text style={{ fontFamily: F.b700, fontSize: 13, color: C.redText }}>Sign out</Text>
-          </Pressable>
+          <PressableScale scaleTo={0.98} onPress={() => router.back()}>
+            <View style={s.signOut}>
+              <Text style={{ fontFamily: F.b700, fontSize: 13, color: C.redText }}>
+                {fil ? "Mag-sign out" : "Sign out"}
+              </Text>
+            </View>
+          </PressableScale>
         </>
       )}
     </PhoneShell>

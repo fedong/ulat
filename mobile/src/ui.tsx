@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   Animated,
   Easing,
@@ -6,9 +6,11 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
   type PressableProps,
   type StyleProp,
+  type TextInputProps,
   type ViewStyle,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -250,6 +252,36 @@ export function PrimaryButton({
         </View>
       </View>
     </PressableScale>
+  );
+}
+
+/** TextInput with the web's focus treatment: teal border + soft teal ring. */
+export function FocusInput(props: TextInputProps) {
+  const [focused, setFocused] = useState(false);
+  return (
+    <TextInput
+      placeholderTextColor={C.faint}
+      {...props}
+      onFocus={(e) => {
+        setFocused(true);
+        props.onFocus?.(e);
+      }}
+      onBlur={(e) => {
+        setFocused(false);
+        props.onBlur?.(e);
+      }}
+      style={[
+        props.style,
+        focused && {
+          borderColor: C.teal,
+          shadowColor: "#0FA3A0",
+          shadowOffset: { width: 0, height: 0 },
+          shadowOpacity: 0.22,
+          shadowRadius: 5,
+          elevation: 2,
+        },
+      ]}
+    />
   );
 }
 
