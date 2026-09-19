@@ -290,10 +290,10 @@ export default function AssessmentsPage({ params }: { params: Promise<{ clsId: s
     "h-11 rounded-xl border-[1.5px] border-line bg-card px-2.5 text-sm font-medium text-ink outline-none focus:border-teal";
 
   return (
-    <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_400px] items-start gap-5">
+    <div className="grid min-h-0 flex-1 grid-cols-1 items-start gap-5 overflow-y-auto lg:grid-cols-[minmax(0,1fr)_minmax(300px,340px)] lg:overflow-visible xl:grid-cols-[minmax(0,1fr)_400px]">
       {/* Left: filters + table + archive */}
       <div className="flex max-h-full min-h-0 flex-col gap-3.5">
-        <div className="flex flex-shrink-0 gap-1.5">
+        <div className="flex flex-shrink-0 flex-wrap gap-1.5">
           {["All", ...periods].map((p) => {
             const on = st.asmFilter === p;
             return (
@@ -313,7 +313,8 @@ export default function AssessmentsPage({ params }: { params: Promise<{ clsId: s
           })}
         </div>
 
-        <div className="flex min-h-0 flex-shrink flex-col overflow-hidden rounded-2xl bg-card shadow-card">
+        {/* overflow-x lets narrow screens scroll the table instead of squeezing columns into each other. */}
+        <div className="flex min-h-0 flex-shrink flex-col overflow-y-hidden overflow-x-auto rounded-2xl bg-card shadow-card">
           <div className="label-caps grid grid-cols-[minmax(150px,2fr)_minmax(140px,1.6fr)_90px_70px_56px_90px_32px] gap-2 border-b border-line bg-canvas px-[18px] py-3 text-sub">
             <span>ASSESSMENT</span>
             <span>COMPONENT</span>

@@ -244,7 +244,7 @@ export default function OverviewPage({ params }: { params: Promise<{ clsId: stri
 
   return (
     <>
-      <div data-tour="overview" className="grid flex-shrink-0 grid-cols-4 gap-3.5">
+      <div data-tour="overview" className="grid flex-shrink-0 grid-cols-2 gap-3.5 lg:grid-cols-4">
         {tiles.map((t) => (
           <button
             key={t.label}
@@ -266,7 +266,7 @@ export default function OverviewPage({ params }: { params: Promise<{ clsId: stri
         ))}
       </div>
 
-      <div className="-mx-1 mt-5 grid min-h-0 flex-1 auto-rows-max grid-cols-2 content-start gap-5 overflow-y-auto px-1 pb-7">
+      <div className="-mx-1 mt-5 grid min-h-0 flex-1 auto-rows-max grid-cols-1 content-start gap-5 overflow-y-auto px-1 pb-7 lg:grid-cols-2">
         {/* Needs attention */}
         <div className="flex flex-col gap-2.5">
           <div className="flex items-baseline justify-between px-0.5">

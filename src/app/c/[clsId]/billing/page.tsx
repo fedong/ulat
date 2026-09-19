@@ -209,7 +209,7 @@ export default function BillingPage({ params }: { params: Promise<{ clsId: strin
         </div>
 
         {co.step === "method" && (
-          <div className="grid grid-cols-[minmax(0,1fr)_320px] items-start gap-6">
+          <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
             <div className="flex flex-col gap-2">
               <div className="label-caps text-sub">{t.payWith}</div>
               <div className="grid grid-cols-3 gap-2">

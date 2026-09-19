@@ -663,7 +663,7 @@ export default function StudentsPage({ params }: { params: Promise<{ clsId: stri
   return (
     <div
       data-tour="students"
-      className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)_400px] items-start gap-5"
+      className="grid min-h-0 flex-1 grid-cols-1 items-start gap-5 overflow-y-auto lg:grid-cols-[minmax(0,1fr)_minmax(300px,340px)] lg:overflow-visible xl:grid-cols-[minmax(0,1fr)_400px]"
     >
       <div className="flex max-h-full min-h-0 min-w-0 flex-col gap-3.5">
         <div className="flex flex-shrink-0 flex-wrap items-center justify-between gap-3">
@@ -709,15 +709,17 @@ export default function StudentsPage({ params }: { params: Promise<{ clsId: stri
           </div>
         </div>
 
-        <div className="flex min-h-0 flex-shrink flex-col overflow-hidden rounded-2xl bg-card shadow-card">
-          <div className="label-caps grid grid-cols-[minmax(0,1fr)_110px_90px_80px_100px] gap-2 border-b border-line bg-canvas px-[18px] py-3 text-sub">
-            <span>STUDENT</span>
+        {/* overflow-x keeps the fixed columns readable on narrow screens instead
+            of letting the 1fr name column collapse to zero and overlap. */}
+        <div className="flex min-h-0 flex-shrink flex-col overflow-y-hidden overflow-x-auto rounded-2xl bg-card shadow-card">
+          <div className="label-caps grid min-w-[560px] grid-cols-[minmax(0,1fr)_110px_90px_80px_100px] gap-2 border-b border-line bg-canvas px-[18px] py-3 text-sub">
+            <span className="truncate">STUDENT</span>
             <span>STUDENT NO.</span>
             <span className="text-right">ATTENDANCE</span>
             <span className="text-right">GRADE</span>
             <span className="text-right">STANDING</span>
           </div>
-          <div className="min-h-0 flex-1 overflow-y-auto">
+          <div className="min-h-0 min-w-[560px] flex-1 overflow-y-auto">
             {studentList.map((r) => {
               const c = computed[r.id];
               return (

@@ -170,7 +170,7 @@ export default function ClassLayout({ children }: { children: React.ReactNode })
       <TourOverlay clsId={cls.id} shellRef={shellRef} />
 
       {/* Sidebar */}
-      <div className="bg-panel-v3 flex min-h-0 flex-col border-r border-white/5 px-4 py-6 text-canvas">
+      <div className="bg-panel-v3 flex min-h-0 flex-col overflow-y-auto border-r border-white/5 px-4 py-6 text-canvas">
         <div className="flex h-[34px] items-center px-2">
           <AnimatedLogo size={30} />
         </div>
@@ -272,6 +272,13 @@ export default function ClassLayout({ children }: { children: React.ReactNode })
             <span
               className="mr-1.5 inline-flex items-center gap-1.5 whitespace-nowrap text-xs font-medium"
               style={{ color: st.syncError ? "#B4231F" : st.saved ? "#0B807E" : "#8A6400" }}
+              title={
+                st.syncError
+                  ? L("Some changes didn't save — check your connection", "May hindi na-save — suriin ang koneksyon")
+                  : st.saved
+                    ? L("All changes saved · students see them now", "Naka-save lahat · kita na ng mga estudyante")
+                    : L("Saving…", "Sine-save…")
+              }
             >
               <span
                 className="inline-block h-[7px] w-[7px] rounded-full"
@@ -280,11 +287,14 @@ export default function ClassLayout({ children }: { children: React.ReactNode })
                   animation: "ulatPulse 2.4s ease-out infinite",
                 }}
               />
-              {st.syncError
-                ? L("Some changes didn't save — check your connection", "May hindi na-save — suriin ang koneksyon")
-                : st.saved
-                  ? L("All changes saved · students see them now", "Naka-save lahat · kita na ng mga estudyante")
-                  : L("Saving…", "Sine-save…")}
+              {/* The label needs real width; below lg the pulsing dot carries the state alone. */}
+              <span className="hidden lg:inline">
+                {st.syncError
+                  ? L("Some changes didn't save — check your connection", "May hindi na-save — suriin ang koneksyon")
+                  : st.saved
+                    ? L("All changes saved · students see them now", "Naka-save lahat · kita na ng mga estudyante")
+                    : L("Saving…", "Sine-save…")}
+              </span>
             </span>
             <ExportMenu clsId={cls.id} />
             <button
