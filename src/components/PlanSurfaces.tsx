@@ -39,21 +39,33 @@ export function PlanBanner({ clsId }: { clsId: string }) {
       : ent.state === "Grace"
         ? L("Keep Pro", "Panatilihin ang Pro")
         : L("Update payment method", "I-update ang bayad");
+  // Trialing gets the strong dark-gradient treatment (same family as the
+  // billing referral banner) with an amber CTA; Grace stays amber-tinted and
+  // Past due stays red.
+  const strong = ent.state === "Trialing";
   const [bg, border, color] =
-    ent.state === "Trialing"
-      ? ["rgba(15,163,160,0.10)", "rgba(15,163,160,0.25)", "#0B807E"]
-      : ent.state === "Grace"
-        ? ["#FFF6DC", "#F2DFA0", "#8A6400"]
-        : ["#FBE9E5", "#F1C7BE", "#B03A24"];
+    ent.state === "Grace"
+      ? ["#FFF6DC", "#F2DFA0", "#8A6400"]
+      : ["#FBE9E5", "#F1C7BE", "#B03A24"];
 
   return (
     <>
       {hasBanner && (
         <div
           className="flex flex-shrink-0 items-center justify-between gap-4 px-8 py-2.5"
-          style={{ background: bg, borderBottom: `1px solid ${border}` }}
+          style={
+            strong
+              ? {
+                  background: "linear-gradient(135deg,#101D26 0%,#16242F 100%)",
+                  borderBottom: "1px solid rgba(255,255,255,0.06)",
+                }
+              : { background: bg, borderBottom: `1px solid ${border}` }
+          }
         >
-          <span className="text-[13px] font-semibold" style={{ color }}>
+          <span
+            className="text-[13px] font-semibold"
+            style={{ color: strong ? "#F5D98F" : color }}
+          >
             {bannerText}
           </span>
           {page !== "billing" && (
@@ -62,8 +74,12 @@ export function PlanBanner({ clsId }: { clsId: string }) {
                 st.set({ checkout: null });
                 router.push(`/c/${clsId}/billing`);
               }}
-              className="h-[30px] flex-shrink-0 cursor-pointer whitespace-nowrap rounded-full bg-transparent px-3 text-xs font-bold"
-              style={{ border: `1.5px solid ${color}`, color }}
+              className="h-[30px] flex-shrink-0 cursor-pointer whitespace-nowrap rounded-full px-3.5 text-xs font-bold"
+              style={
+                strong
+                  ? { background: "#F5B70A", color: "#1A2530", border: "none" }
+                  : { background: "transparent", border: `1.5px solid ${color}`, color }
+              }
             >
               {bannerCta}
             </button>

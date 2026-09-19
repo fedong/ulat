@@ -1,7 +1,7 @@
 "use client";
 
 import { useParams, usePathname, useRouter } from "next/navigation";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AccountMenu } from "@/components/AccountMenu";
 import { AnimatedLogo } from "@/components/AnimatedLogo";
 import { ConfirmDialogHost } from "@/components/ConfirmDialogHost";
@@ -38,6 +38,22 @@ export default function ClassLayout({ children }: { children: React.ReactNode })
   const computed = usePeriodComputed(cls);
   const { limitHit, fil, L } = useEntitlement();
   const t = billingStrings(fil);
+
+  // Collapsible header (remembered per browser); the product tour needs the
+  // full header for its "+ Assessment" stop, so it forces it open.
+  const [hdrMin, setHdrMin] = useState(false);
+  useEffect(() => {
+    try {
+      setHdrMin(localStorage.getItem("ulat_hdr_min") === "1");
+    } catch {}
+  }, []);
+  const toggleHdr = () =>
+    setHdrMin((v) => {
+      try {
+        localStorage.setItem("ulat_hdr_min", v ? "0" : "1");
+      } catch {}
+      return !v;
+    });
 
   // Demo-only entitlement override: localStorage.ulat_ent = Trialing | Active |
   // Past due | Grace | Free (stand-in for the prototype's tweaks panel).
@@ -260,6 +276,39 @@ export default function ClassLayout({ children }: { children: React.ReactNode })
 
       {/* Main column */}
       <div className="flex min-h-0 min-w-0 flex-col overflow-hidden">
+        {hdrMin && !st.tour ? (
+          <div className="header-frost flex flex-shrink-0 items-center justify-between gap-4 px-8 py-2">
+            <div className="min-w-0 truncate text-[13px] font-bold text-ink">{headerTitle}</div>
+            <div className="flex flex-shrink-0 items-center gap-3">
+              {!onAccountPage && (
+                <span
+                  className="inline-block h-[7px] w-[7px] rounded-full"
+                  title={
+                    st.syncError
+                      ? L("Some changes didn't save — check your connection", "May hindi na-save — suriin ang koneksyon")
+                      : st.saved
+                        ? L("All changes saved · students see them now", "Naka-save lahat · kita na ng mga estudyante")
+                        : L("Saving…", "Sine-save…")
+                  }
+                  style={{
+                    background: st.syncError ? "#D64541" : st.saved ? "#0FA3A0" : "#F5B70A",
+                    animation: "ulatPulse 2.4s ease-out infinite",
+                  }}
+                />
+              )}
+              <button
+                onClick={toggleHdr}
+                title={L("Expand header", "I-expand ang header")}
+                aria-label={L("Expand header", "I-expand ang header")}
+                className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg text-sub hover:bg-black/[0.05] hover:text-ink"
+              >
+                <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <polyline points="6 9 12 15 18 9" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        ) : (
         <div className="header-frost flex flex-shrink-0 items-center justify-between gap-6 px-8 py-[22px]">
           <div className="min-w-0">
             <div className="title-gradient truncate font-display text-[22px] font-extrabold tracking-[-0.4px]">
@@ -306,7 +355,18 @@ export default function ClassLayout({ children }: { children: React.ReactNode })
             </button>
           </div>
           )}
+          <button
+            onClick={toggleHdr}
+            title={L("Collapse header", "I-collapse ang header")}
+            aria-label={L("Collapse header", "I-collapse ang header")}
+            className="-mr-2 flex h-7 w-7 flex-shrink-0 cursor-pointer items-center justify-center rounded-lg text-sub hover:bg-black/[0.05] hover:text-ink"
+          >
+            <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <polyline points="18 15 12 9 6 15" />
+            </svg>
+          </button>
         </div>
+        )}
 
         <PlanBanner clsId={cls.id} />
 
