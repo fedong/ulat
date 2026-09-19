@@ -703,7 +703,7 @@ async function main() {
   });
   ok(demo.status === 200, "demo instructor logs in");
   const demoList = await api("GET", "/api/v1/classes", { token: demo.body.access });
-  ok(demoList.body.classes.length === 2, "demo account has both seeded classes");
+  ok(demoList.body.classes.length === 1, "demo account has the CS101 demo class");
 
   for (const local of seedClasses()) {
     const served: Klass = (

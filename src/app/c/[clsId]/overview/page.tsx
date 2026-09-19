@@ -242,6 +242,150 @@ export default function OverviewPage({ params }: { params: Promise<{ clsId: stri
   const termAvgColor = ta === null ? "#9AA3AB" : STANDING_COLORS[standing(gs, ta, false)][1];
   const passingPctText = passing + "%";
 
+  /* ---- class performance over time (mean % per graded assessment) ---- */
+  const perf = asms
+    .map((a) => {
+      const vs = roster
+        .map((r) => (cls.scores[r.id] || {})[a.id])
+        .map((v) => (v === "MISSED" ? 0 : v))
+        .filter((v): v is number => typeof v === "number");
+      if (!vs.length) return null;
+      return {
+        id: a.id,
+        name: a.name,
+        period: a.period,
+        date: a.date,
+        mean: (vs.reduce((x, y) => x + y, 0) / vs.length / Number(a.max)) * 100,
+      };
+    })
+    .filter((x): x is NonNullable<typeof x> => x !== null)
+    .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+  // SVG geometry: fixed viewBox, uniform scale; passing line as reference.
+  const PW = 640;
+  const PH = 150;
+  const PPAD = { l: 30, r: 46, t: 14, b: 22 };
+  const px = (i: number) =>
+    PPAD.l + (perf.length < 2 ? 0.5 : i / (perf.length - 1)) * (PW - PPAD.l - PPAD.r);
+  const py = (v: number) => PPAD.t + (1 - v / 100) * (PH - PPAD.t - PPAD.b);
+  const perfPath = perf.map((p, i) => (i ? "L" : "M") + px(i).toFixed(1) + " " + py(p.mean).toFixed(1)).join(" ");
+  const perfArea =
+    perf.length > 1
+      ? perfPath +
+        ` L ${px(perf.length - 1).toFixed(1)} ${py(0)} L ${px(0).toFixed(1)} ${py(0)} Z`
+      : "";
+  const perfTickIdx =
+    perf.length <= 5
+      ? perf.map((_, i) => i)
+      : [0, Math.round((perf.length - 1) / 3), Math.round(((perf.length - 1) * 2) / 3), perf.length - 1];
+  const perfLast = perf[perf.length - 1];
+  const perfDelta =
+    perf.length >= 2 ? perf[perf.length - 1].mean - perf[perf.length - 2].mean : null;
+
+  /* ---- path to passing (simulate remaining work in this period) ---- */
+  const pathRows = cur
+    .filter((x) => x.c.k === "fail" || x.c.k === "inc")
+    .map((x) => {
+      const rid = x.r.id;
+      const remaining = asms.filter((a) => {
+        const v = (cls.scores[rid] || {})[a.id];
+        return a.period === period && (v === undefined || v === null);
+      });
+      const simAt = (f: number) => {
+        const sc = { ...(cls.scores[rid] || {}) };
+        remaining.forEach((a) => (sc[a.id] = Math.round(Number(a.max) * f)));
+        const r = periodOf(cls, gs, rid, period, sc);
+        return r ? r.pct : null;
+      };
+      if (!remaining.length)
+        return { id: rid, name: x.r.name, note: "No work left in " + period, kind: "done" as const };
+      const p100 = simAt(1);
+      const p0 = simAt(0);
+      if (p100 === null || p0 === null || p100 <= p0)
+        return { id: rid, name: x.r.name, note: "No work left in " + period, kind: "done" as const };
+      if (p100 < passing)
+        return {
+          id: rid,
+          name: x.r.name,
+          note: "Even perfect scores on the remaining " + remaining.length + " reach only " + p100.toFixed(0) + "%",
+          kind: "out" as const,
+        };
+      const needed = Math.max(0, Math.ceil(((passing - p0) / (p100 - p0)) * 100));
+      return {
+        id: rid,
+        name: x.r.name,
+        note:
+          "Needs a " + needed + "% average on the remaining " +
+          remaining.length + " assessment" + (remaining.length === 1 ? "" : "s"),
+        kind: needed > 90 ? ("stretch" as const) : ("reach" as const),
+      };
+    })
+    .sort((a, b) => {
+      const o = { reach: 0, stretch: 1, out: 2, done: 3 };
+      return o[a.kind] - o[b.kind];
+    });
+  const PATH_CHIP: Record<string, [string, string, string]> = {
+    reach: ["Reachable", "rgba(15,163,160,0.12)", "#0B807E"],
+    stretch: ["Stretch", "#FFF6DC", "#8A6400"],
+    out: ["Out of reach", "#FBE9E5", "#B03A24"],
+    done: ["Final", "#EFEAE0", "#5A6672"],
+  };
+
+  /* ---- movers vs the previous period ---- */
+  const prevPeriod = periods[periods.indexOf(period) - 1];
+  const movers = !prevPeriod
+    ? []
+    : cur
+        .map((x) => {
+          const prev = periodOf(cls, gs, x.r.id, prevPeriod);
+          if (!prev || prev.pct === null || x.c.pct === null) return null;
+          return { id: x.r.id, name: x.r.name, delta: x.c.pct - prev.pct, now: x.c.pct };
+        })
+        .filter((m): m is NonNullable<typeof m> => m !== null && Math.abs(m.delta) >= 1)
+        .sort((a, b) => b.delta - a.delta);
+  const gainers = movers.filter((m) => m.delta > 0).slice(0, 4);
+  const sliders = movers
+    .filter((m) => m.delta < 0)
+    .slice(-4)
+    .reverse();
+
+  /* ---- attendance by session + chronic absences ---- */
+  const sessDays = [...new Set(cls.sessions.map((s) => s.date))].sort();
+  const attByDay = sessDays.map((date) => {
+    const ss = cls.sessions.filter((s) => s.date === date);
+    let present = 0;
+    let counted = 0;
+    ss.forEach((s) =>
+      roster.forEach((r) => {
+        const m = s.marks[r.id] || "P";
+        if (m === "E") return;
+        counted++;
+        if (m !== "A") present++;
+      }),
+    );
+    const rate = counted ? Math.round((present / counted) * 100) : 100;
+    return {
+      date,
+      rate,
+      bg: rate >= 85 ? "#0FA3A0" : rate >= 70 ? "#F5B70A" : "#D14B33",
+      title: fmtDate(date) + " · " + rate + "% present",
+    };
+  });
+  const absentees = roster
+    .map((r) => ({ id: r.id, name: r.name, rate: attRate(cls, r.id) }))
+    .filter((a) => a.rate < 85)
+    .sort((a, b) => a.rate - b.rate);
+
+  /* ---- missing work (MISSED marks across the whole term) ---- */
+  const missRows = roster
+    .map((r) => {
+      const sc = cls.scores[r.id] || {};
+      const missed = asms.filter((a) => sc[a.id] === "MISSED");
+      return { id: r.id, name: r.name, n: missed.length, names: missed.map((a) => a.name) };
+    })
+    .filter((m) => m.n > 0)
+    .sort((a, b) => b.n - a.n);
+  const missTotal = missRows.reduce((a, m) => a + m.n, 0);
+
   return (
     <>
       <div data-tour="overview" className="grid flex-shrink-0 grid-cols-2 gap-3.5 lg:grid-cols-4">
@@ -267,6 +411,68 @@ export default function OverviewPage({ params }: { params: Promise<{ clsId: stri
       </div>
 
       <div className="-mx-1 mt-5 grid min-h-0 flex-1 auto-rows-max grid-cols-1 content-start gap-5 overflow-y-auto px-1 pb-7 lg:grid-cols-2">
+        {/* Class performance over time */}
+        <div className="flex flex-col gap-2.5 lg:col-span-2">
+          <div className="flex items-baseline justify-between px-0.5">
+            <div className="font-display text-[17px] font-extrabold">
+              Class performance over time{" "}
+              <span className="font-body text-sm font-semibold text-sub">
+                · mean score per assessment
+              </span>
+            </div>
+            {perfDelta !== null && (
+              <span
+                className="text-[13px] font-bold"
+                style={{ color: perfDelta >= 0 ? "#0B807E" : "#B03A24" }}
+              >
+                {perfDelta >= 0 ? "▲" : "▼"} {Math.abs(perfDelta).toFixed(1)} pts vs previous
+              </span>
+            )}
+          </div>
+          <div className="rounded-2xl bg-card px-[18px] pb-2 pt-3 shadow-card">
+            {perf.length === 0 ? (
+              <div className="py-6 text-center text-[13px] text-faint">
+                The trend appears once assessments are graded.
+              </div>
+            ) : (
+              <svg viewBox={`0 0 ${PW} ${PH}`} className="block h-auto w-full" role="img"
+                aria-label="Line chart of the class mean score for each graded assessment in date order">
+                {/* passing reference line */}
+                <line x1={PPAD.l} x2={PW - PPAD.r} y1={py(passing)} y2={py(passing)}
+                  stroke="#E8E2D6" strokeWidth={1} />
+                <text x={PPAD.l + 4} y={py(passing) - 5} fontSize={10} fill="#8A94A0" fontWeight={600}>
+                  pass {passing}%
+                </text>
+                {[0, 50, 100].map((v) => (
+                  <text key={v} x={PPAD.l - 6} y={py(v) + 3.5} fontSize={10} fill="#B3BAC2" textAnchor="end">
+                    {v}
+                  </text>
+                ))}
+                {perfArea && <path d={perfArea} fill="rgba(15,163,160,0.10)" />}
+                <path d={perfPath} fill="none" stroke="#0FA3A0" strokeWidth={2}
+                  strokeLinejoin="round" strokeLinecap="round" />
+                {perf.map((p, i) => (
+                  <circle key={p.id} cx={px(i)} cy={py(p.mean)} r={4.5} fill="#0FA3A0"
+                    stroke="#FFFFFF" strokeWidth={2}>
+                    <title>{p.name + " · " + p.mean.toFixed(0) + "% mean · " + p.period + " · " + fmtDate(p.date)}</title>
+                  </circle>
+                ))}
+                {perfLast && (
+                  <text x={px(perf.length - 1) + 9} y={py(perfLast.mean) + 4} fontSize={12}
+                    fontWeight={700} fill="#22303C">
+                    {perfLast.mean.toFixed(0)}%
+                  </text>
+                )}
+                {perfTickIdx.map((i) => (
+                  <text key={i} x={px(i)} y={PH - 6} fontSize={10} fill="#8A94A0" textAnchor="middle">
+                    {fmtDate(perf[i].date)}
+                  </text>
+                ))}
+              </svg>
+            )}
+          </div>
+        </div>
+
         {/* Needs attention */}
         <div className="flex flex-col gap-2.5">
           <div className="flex items-baseline justify-between px-0.5">
@@ -480,6 +686,189 @@ export default function OverviewPage({ params }: { params: Promise<{ clsId: stri
                   </div>
                   <div className="text-[11px] font-medium text-sub">passed</div>
                 </div>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Path to passing */}
+        <div className="flex flex-col gap-2.5">
+          <div className="px-0.5 font-display text-[17px] font-extrabold">
+            Path to passing · {period}{" "}
+            <span className="font-body text-sm font-semibold text-sub">
+              · what the remaining work can still do
+            </span>
+          </div>
+          <div className="max-h-[340px] overflow-y-auto rounded-2xl bg-card pb-1.5 shadow-card">
+            {pathRows.length === 0 && (
+              <div className="px-[18px] py-6 text-center text-[13px] text-faint">
+                No one is failing or incomplete in {period}. 🎉
+              </div>
+            )}
+            {pathRows.map((s) => (
+              <button
+                key={s.id}
+                onClick={() => go("students", { student: s.id, remarkDraft: null })}
+                className="flex w-full cursor-pointer items-center justify-between gap-2.5 border-b border-hairline bg-card px-[18px] py-2.5 text-left text-ink hover:bg-canvas"
+              >
+                <div className="min-w-0">
+                  <div className="text-sm font-semibold">{s.name}</div>
+                  <div className="mt-0.5 text-xs leading-[1.4] text-sub">{s.note}</div>
+                </div>
+                <span
+                  className="whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-bold"
+                  style={{ background: PATH_CHIP[s.kind][1], color: PATH_CHIP[s.kind][2] }}
+                >
+                  {PATH_CHIP[s.kind][0]}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Movers vs previous period */}
+        <div className="flex flex-col gap-2.5">
+          <div className="px-0.5 font-display text-[17px] font-extrabold">
+            On the move{" "}
+            <span className="font-body text-sm font-semibold text-sub">
+              {prevPeriod ? "· " + prevPeriod + " → " + period : "· needs two graded periods"}
+            </span>
+          </div>
+          <div className="max-h-[340px] overflow-y-auto rounded-2xl bg-card pb-1.5 shadow-card">
+            {(!prevPeriod || (gainers.length === 0 && sliders.length === 0)) && (
+              <div className="px-[18px] py-6 text-center text-[13px] text-faint">
+                {prevPeriod
+                  ? "No student moved more than a point between periods."
+                  : "Once two periods have grades, the biggest improvements and slips show here."}
+              </div>
+            )}
+            {gainers.map((m) => (
+              <button
+                key={m.id}
+                onClick={() => go("students", { student: m.id, remarkDraft: null })}
+                className="flex w-full cursor-pointer items-center justify-between gap-2.5 border-b border-hairline bg-card px-[18px] py-2.5 text-left text-ink hover:bg-canvas"
+              >
+                <div className="min-w-0">
+                  <div className="text-sm font-semibold">{m.name}</div>
+                  <div className="mt-0.5 text-xs text-sub">now {m.now.toFixed(1)}%</div>
+                </div>
+                <span className="whitespace-nowrap text-[13px] font-bold" style={{ color: "#0B807E" }}>
+                  ▲ {m.delta.toFixed(1)} pts
+                </span>
+              </button>
+            ))}
+            {sliders.map((m) => (
+              <button
+                key={m.id}
+                onClick={() => go("students", { student: m.id, remarkDraft: null })}
+                className="flex w-full cursor-pointer items-center justify-between gap-2.5 border-b border-hairline bg-card px-[18px] py-2.5 text-left text-ink hover:bg-canvas"
+              >
+                <div className="min-w-0">
+                  <div className="text-sm font-semibold">{m.name}</div>
+                  <div className="mt-0.5 text-xs text-sub">now {m.now.toFixed(1)}%</div>
+                </div>
+                <span className="whitespace-nowrap text-[13px] font-bold" style={{ color: "#B03A24" }}>
+                  ▼ {Math.abs(m.delta).toFixed(1)} pts
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Attendance by session */}
+        <div className="flex flex-col gap-2.5">
+          <div className="flex items-baseline justify-between px-0.5">
+            <div className="font-display text-[17px] font-extrabold">
+              Attendance by session{" "}
+              <span className="font-body text-sm font-semibold text-sub">
+                · {sessDays.length} days
+              </span>
+            </div>
+            <button
+              onClick={() => go("attendance")}
+              className="cursor-pointer text-[13px] font-bold text-teal-text"
+            >
+              Attendance →
+            </button>
+          </div>
+          <div className="flex flex-col gap-3 rounded-2xl bg-card px-[18px] py-4 shadow-card">
+            {sessDays.length === 0 ? (
+              <div className="py-4 text-center text-[13px] text-faint">
+                No sessions recorded yet.
+              </div>
+            ) : (
+              <>
+                <div className="flex h-[72px] items-end gap-[3px] border-b border-line">
+                  {attByDay.map((d) => (
+                    <div
+                      key={d.date}
+                      title={d.title}
+                      className="max-w-[24px] flex-1 rounded-t"
+                      style={{ background: d.bg, height: Math.max(6, d.rate * 0.72) + "px" }}
+                    />
+                  ))}
+                </div>
+                <div className="flex justify-between text-[11px] font-semibold text-sub">
+                  <span>{fmtDate(sessDays[0])}</span>
+                  <span>{fmtDate(sessDays[sessDays.length - 1])}</span>
+                </div>
+                {absentees.length === 0 ? (
+                  <div className="text-xs text-sub">
+                    No one is below 85% attendance. Good sign — attendance problems usually show
+                    up in grades two weeks later.
+                  </div>
+                ) : (
+                  <div className="flex flex-col">
+                    <div className="label-caps mb-1 text-sub">BELOW 85%</div>
+                    {absentees.map((a) => (
+                      <button
+                        key={a.id}
+                        onClick={() => go("students", { student: a.id, remarkDraft: null })}
+                        className="flex cursor-pointer items-center justify-between border-t border-hairline py-2 text-left"
+                      >
+                        <span className="text-[13px] font-semibold text-ink">{a.name}</span>
+                        <span className="text-[13px] font-bold" style={{ color: a.rate >= 80 ? "#8A6400" : "#B03A24" }}>
+                          {a.rate}%
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* Missing work */}
+        <div className="flex flex-col gap-2.5">
+          <div className="px-0.5 font-display text-[17px] font-extrabold">
+            Missing work{" "}
+            <span className="font-body text-sm font-semibold text-sub">
+              · {missTotal} missed across the term
+            </span>
+          </div>
+          <div className="max-h-[340px] overflow-y-auto rounded-2xl bg-card pb-1.5 shadow-card">
+            {missRows.length === 0 && (
+              <div className="px-[18px] py-6 text-center text-[13px] text-faint">
+                Nothing marked missed. Scores flagged M in the gradebook collect here.
+              </div>
+            )}
+            {missRows.map((m) => (
+              <button
+                key={m.id}
+                onClick={() => go("students", { student: m.id, remarkDraft: null })}
+                className="flex w-full cursor-pointer items-center justify-between gap-2.5 border-b border-hairline bg-card px-[18px] py-2.5 text-left text-ink hover:bg-canvas"
+              >
+                <div className="min-w-0">
+                  <div className="text-sm font-semibold">{m.name}</div>
+                  <div className="mt-0.5 truncate text-xs text-sub">
+                    {m.names.slice(0, 2).join(", ")}
+                    {m.n > 2 ? " +" + (m.n - 2) + " more" : ""}
+                  </div>
+                </div>
+                <span className="whitespace-nowrap rounded-full bg-[#FBE9E5] px-2.5 py-1 text-xs font-bold text-[#B03A24]">
+                  {m.n} missed
+                </span>
               </button>
             ))}
           </div>

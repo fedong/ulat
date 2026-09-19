@@ -40,14 +40,25 @@ export function TourOverlay({
       return;
     }
     if (!tDef.target) return;
+    // Keep re-measuring until the rect holds still: the page's entrance
+    // animation (ulatIn) translates content for ~300ms, so a single early
+    // measurement would spotlight a mid-flight position.
     let raf = 0;
     let tries = 0;
+    let frames = 0;
+    let stable = 0;
+    let scrolled = false;
     const measure = () => {
       const shell = shellRef.current;
       const el = shell?.querySelector(`[data-tour="${tDef.target}"]`);
       if (!shell || !el) {
-        if (tries++ < 60) raf = requestAnimationFrame(measure);
+        if (tries++ < 120) raf = requestAnimationFrame(measure);
         return;
+      }
+      if (!scrolled) {
+        scrolled = true;
+        // Targets can sit inside scrollable panes; bring them into view once.
+        el.scrollIntoView({ block: "nearest", inline: "nearest" });
       }
       const fr = shell.getBoundingClientRect();
       const r = el.getBoundingClientRect();
@@ -59,20 +70,28 @@ export function TourOverlay({
         h: r.height + 16,
       };
       const cur = useUlat.getState().tourRect;
-      if (
+      const changed =
         !cur ||
         cur.key !== next.key ||
         Math.abs(cur.x - next.x) > 1 ||
         Math.abs(cur.y - next.y) > 1 ||
         Math.abs(cur.w - next.w) > 1 ||
-        Math.abs(cur.h - next.h) > 1
-      )
+        Math.abs(cur.h - next.h) > 1;
+      if (changed) {
         st.set({ tourRect: next });
+        stable = 0;
+      } else {
+        stable++;
+      }
+      // Settle: stop once the rect held still for ~8 frames, cap at ~3s.
+      if (stable < 8 && frames++ < 180) raf = requestAnimationFrame(measure);
     };
     raf = requestAnimationFrame(measure);
     const onResize = () => {
       cancelAnimationFrame(raf);
       tries = 0;
+      frames = 0;
+      stable = 0;
       raf = requestAnimationFrame(measure);
     };
     window.addEventListener("resize", onResize);
@@ -106,12 +125,15 @@ export function TourOverlay({
   const isDone = tDef.key === "done";
   const isStop = !!tDef.target;
   const stopIdx = TOUR_STOPS.findIndex((t) => t.key === tDef.key);
-  const tr = st.tourRect && st.tourRect.key === tDef.key ? st.tourRect : null;
+  // Use the last measured rect even while the next stop is still measuring,
+  // so the spotlight and card glide from the old target to the new one
+  // instead of snapping to a centered fallback in between.
+  const tr = isStop ? st.tourRect : null;
 
   const tourGo = (step: number) => {
     const d = TOUR[step];
     if (!d) return;
-    st.set({ tour: { step }, dialog: null, tourRect: null });
+    st.set({ tour: { step }, dialog: null });
   };
   const tourEnd = () => {
     markTourDone();

@@ -1,6 +1,6 @@
 /**
  * Seed the demo instructor (d.rivera@univ.edu.ph / ulat-demo-2026) with the
- * same CS101 + MTEC305A classes the local prototypes ship, preserving ids so
+ * same CS101 demo class the local prototypes ship, preserving ids so
  * client fixtures and API data stay interchangeable.
  */
 import { PrismaClient } from "@prisma/client";
@@ -166,6 +166,9 @@ async function seedGuardian() {
 }
 
 async function main() {
+  // The demo now ships CS101 only — drop a previously seeded MTEC305A
+  // (children cascade). No-op on fresh databases.
+  await prisma.class.deleteMany({ where: { id: "mtec305a" } });
   await seedInstructor();
   await seedStudent();
   await seedGuardian();

@@ -44,8 +44,7 @@ try {
 
   await vis("Tour the demo account").click();
   await vis("CS101 · BSCS 2A", false).waitFor({ timeout: 20000 });
-  await vis("MTEC305A", false).waitFor();
-  ok(true, "demo sign-in loads both classes live from the API");
+  ok(true, "demo sign-in loads the demo class live from the API");
 
   console.log("attendance write → cloud");
   await vis("Attendance").click();
