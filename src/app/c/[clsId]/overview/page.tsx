@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { use } from "react";
+import { use, useState } from "react";
 import { fmtDate } from "@/lib/derive";
 import {
   attRate,
@@ -20,6 +20,7 @@ export default function OverviewPage({ params }: { params: Promise<{ clsId: stri
   const { clsId } = use(params);
   const router = useRouter();
   const st = useUlat();
+  const [perfHover, setPerfHover] = useState<number | null>(null);
   const cls = useClass(clsId);
   const computed = usePeriodComputed(cls);
   if (!cls) return null;
@@ -90,6 +91,11 @@ export default function OverviewPage({ params }: { params: Promise<{ clsId: stri
         : (pcts[pcts.length / 2 - 1] + pcts[pcts.length / 2]) / 2
       ).toFixed(1) + "%"
     : "—";
+  const classSigma = (() => {
+    if (pcts.length < 2) return "—";
+    const m = pcts.reduce((a, b) => a + b, 0) / pcts.length;
+    return Math.sqrt(pcts.reduce((a, p) => a + (p - m) * (p - m), 0) / pcts.length).toFixed(1);
+  })();
   const rowsT = gs.table.slice().sort((a, b) => Number(a.lo) - Number(b.lo));
   const bins = rowsT
     .map((r, i) => {
@@ -132,7 +138,8 @@ export default function OverviewPage({ params }: { params: Promise<{ clsId: stri
       .sort((a, b) => a.p - b.p);
     if (comps.length) out.push("weakest " + comps[0].n + " " + Math.round(comps[0].p * 100) + "%");
     const at = attRate(cls, x.r.id);
-    if (at < 85) out.push("attendance " + at + "%");
+    // ABC early-warning line: missing more than 10% of class time.
+    if (at < 90) out.push("attendance " + at + "%");
     if (x.c.k === "inc") out.push("exam pending");
     return out.join(" · ") || "Close to the passing line";
   };
@@ -186,6 +193,37 @@ export default function OverviewPage({ params }: { params: Promise<{ clsId: stri
       " below passing. A review session or retake there moves the most students."
     : "Averages appear once components are graded.";
 
+  /* ---- assessment discrimination (Ebel's upper–lower 27% index) ---- */
+  const ranked = cur
+    .filter((x) => x.c.pct !== null)
+    .slice()
+    .sort((a, b) => (b.c.pct as number) - (a.c.pct as number));
+  const third = Math.max(3, Math.round(ranked.length * 0.27));
+  const upperIds = new Set(ranked.slice(0, third).map((x) => x.r.id));
+  const lowerIds = new Set(ranked.slice(-third).map((x) => x.r.id));
+  const discOf = (aid: string, max: number) => {
+    if (ranked.length < 6) return null;
+    const grp = (ids: Set<string>) => {
+      const vs = [...ids]
+        .map((id) => (cls.scores[id] || {})[aid])
+        .map((v) => (v === "MISSED" ? 0 : v))
+        .filter((v): v is number => typeof v === "number");
+      return vs.length ? vs.reduce((a, b) => a + b, 0) / vs.length / max : null;
+    };
+    const u = grp(upperIds);
+    const l = grp(lowerIds);
+    return u === null || l === null ? null : u - l;
+  };
+  // Ebel's interpretation bands for D.
+  const discBand = (d: number | null): [string, string] =>
+    d === null
+      ? ["—", "#9AA3AB"]
+      : d >= 0.4
+        ? ["strong", "#0B807E"]
+        : d >= 0.2
+          ? ["fair", "#8A6400"]
+          : ["weak", "#B03A24"];
+
   /* ---- hardest assessments ---- */
   const asmDiff = asms
     .filter((a) => a.period === period)
@@ -197,6 +235,8 @@ export default function OverviewPage({ params }: { params: Promise<{ clsId: stri
       if (!vs.length) return null;
       const mean = (vs.reduce((x, y) => x + y, 0) / vs.length / Number(a.max)) * 100;
       const pr = (vs.filter((v) => (v / Number(a.max)) * 100 >= passing).length / vs.length) * 100;
+      const d = discOf(a.id, Number(a.max));
+      const [discLabel, discColor] = discBand(d);
       return {
         id: a.id,
         name: a.name,
@@ -208,6 +248,15 @@ export default function OverviewPage({ params }: { params: Promise<{ clsId: stri
         meanColor: mean >= passing ? "#0B807E" : "#B03A24",
         passRate: pr.toFixed(0) + "%",
         passColor: pr >= 75 ? "#0B807E" : pr >= 50 ? "#8A6400" : "#B03A24",
+        disc: d === null ? "—" : d.toFixed(2),
+        discLabel,
+        discColor,
+        discTitle:
+          d === null
+            ? "Needs at least 6 graded students"
+            : "Discrimination index (Ebel): top vs bottom 27% of the class scored " +
+              Math.round(d * 100) +
+              " pts apart on this. ≥0.40 strong · 0.20–0.39 fair · <0.20 weak (too easy, too hard, or off-topic).",
       };
     })
     .filter((x): x is NonNullable<typeof x> => x !== null)
@@ -256,10 +305,25 @@ export default function OverviewPage({ params }: { params: Promise<{ clsId: stri
         period: a.period,
         date: a.date,
         mean: (vs.reduce((x, y) => x + y, 0) / vs.length / Number(a.max)) * 100,
+        passRate: Math.round(
+          (vs.filter((v) => (v / Number(a.max)) * 100 >= passing).length / vs.length) * 100,
+        ),
+        graded: vs.length,
       };
     })
     .filter((x): x is NonNullable<typeof x> => x !== null)
     .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+  // Period boundaries for the trend chart (index where a new period starts).
+  const perfBounds = perf
+    .map((p, i) => (i > 0 && p.period !== perf[i - 1].period ? i : -1))
+    .filter((i) => i > 0);
+  const perfSegs = perf.length
+    ? [0, ...perfBounds].map((startI, si, arr) => ({
+        startI,
+        label: perf[startI].period,
+        endI: si + 1 < arr.length ? arr[si + 1] - 1 : perf.length - 1,
+      }))
+    : [];
   // SVG geometry: fixed viewBox, uniform scale; passing line as reference.
   const PW = 640;
   const PH = 150;
@@ -348,6 +412,43 @@ export default function OverviewPage({ params }: { params: Promise<{ clsId: stri
     .slice(-4)
     .reverse();
 
+  /* ---- grading backlog (assessments past their date with unscored cells) ---- */
+  const todayISO = new Date().toISOString().slice(0, 10);
+  const backlog = asms
+    .filter((a) => a.date && a.date <= todayISO)
+    .map((a) => ({
+      id: a.id,
+      name: a.name,
+      period: a.period,
+      date: fmtDate(a.date),
+      n: roster.filter((r) => {
+        const v = (cls.scores[r.id] || {})[a.id];
+        return v === undefined || v === null;
+      }).length,
+    }))
+    .filter((a) => a.n > 0 && a.n < roster.length)
+    .sort((a, b) => b.n - a.n);
+  const backlogTotal = backlog.reduce((s, a) => s + a.n, 0);
+
+  /* ---- attendance × grade quadrant (ABC early-warning thresholds) ---- */
+  const quad = cur
+    .filter((x) => x.c.pct !== null)
+    .map((x) => ({
+      id: x.r.id,
+      name: x.r.name,
+      initials: (x.r.first[0] || "") + (x.r.last[0] || ""),
+      att: attRate(cls, x.r.id),
+      pct: x.c.pct as number,
+      color: x.c.color,
+    }));
+  const QW = 300;
+  const QH = 210;
+  const QP = { l: 30, r: 36, t: 12, b: 24 };
+  const qXmin = Math.min(60, ...quad.map((q) => q.att - 4));
+  const qx = (att: number) => QP.l + ((att - qXmin) / (100 - qXmin)) * (QW - QP.l - QP.r);
+  const qYmin = Math.max(0, Math.min(50, ...quad.map((q) => q.pct - 6)));
+  const qy = (pct: number) => QP.t + (1 - (pct - qYmin) / (100 - qYmin)) * (QH - QP.t - QP.b);
+
   /* ---- attendance by session + chronic absences ---- */
   const sessDays = [...new Set(cls.sessions.map((s) => s.date))].sort();
   const attByDay = sessDays.map((date) => {
@@ -372,7 +473,7 @@ export default function OverviewPage({ params }: { params: Promise<{ clsId: stri
   });
   const absentees = roster
     .map((r) => ({ id: r.id, name: r.name, rate: attRate(cls, r.id) }))
-    .filter((a) => a.rate < 85)
+    .filter((a) => a.rate < 90)
     .sort((a, b) => a.rate - b.rate);
 
   /* ---- missing work (MISSED marks across the whole term) ---- */
@@ -411,6 +512,11 @@ export default function OverviewPage({ params }: { params: Promise<{ clsId: stri
       </div>
 
       <div className="-mx-1 mt-5 grid min-h-0 flex-1 auto-rows-max grid-cols-1 content-start gap-5 overflow-y-auto px-1 pb-7 lg:grid-cols-2">
+        <div className="mt-3 flex items-center gap-3 px-0.5 lg:col-span-2">
+          <span className="label-caps whitespace-nowrap text-sub">HOW THE CLASS IS DOING</span>
+          <span className="h-px flex-1 bg-line" />
+        </div>
+
         {/* Class performance over time */}
         <div className="flex flex-col gap-2.5 lg:col-span-2">
           <div className="flex items-baseline justify-between px-0.5">
@@ -435,84 +541,87 @@ export default function OverviewPage({ params }: { params: Promise<{ clsId: stri
                 The trend appears once assessments are graded.
               </div>
             ) : (
-              <svg viewBox={`0 0 ${PW} ${PH}`} className="block h-auto w-full" role="img"
-                aria-label="Line chart of the class mean score for each graded assessment in date order">
-                {/* passing reference line */}
-                <line x1={PPAD.l} x2={PW - PPAD.r} y1={py(passing)} y2={py(passing)}
-                  stroke="#E8E2D6" strokeWidth={1} />
-                <text x={PPAD.l + 4} y={py(passing) - 5} fontSize={10} fill="#8A94A0" fontWeight={600}>
-                  pass {passing}%
-                </text>
-                {[0, 50, 100].map((v) => (
-                  <text key={v} x={PPAD.l - 6} y={py(v) + 3.5} fontSize={10} fill="#B3BAC2" textAnchor="end">
-                    {v}
+              <div className="relative" onMouseLeave={() => setPerfHover(null)}>
+                <svg viewBox={`0 0 ${PW} ${PH}`} className="block h-auto w-full" role="img"
+                  aria-label="Line chart of the class mean score for each graded assessment in date order">
+                  {/* period boundaries + segment labels */}
+                  {perfBounds.map((i) => (
+                    <line key={i} x1={(px(i - 1) + px(i)) / 2} x2={(px(i - 1) + px(i)) / 2}
+                      y1={PPAD.t - 2} y2={PH - PPAD.b} stroke="#EFEAE0" strokeWidth={1} />
+                  ))}
+                  {perfSegs.length > 1 &&
+                    perfSegs.map((s) => (
+                      <text key={s.label + s.startI} x={(px(s.startI) + px(s.endI)) / 2} y={PPAD.t - 3}
+                        fontSize={9} fill="#B3BAC2" fontWeight={700} textAnchor="middle"
+                        style={{ letterSpacing: "0.5px" }}>
+                        {s.label.toUpperCase()}
+                      </text>
+                    ))}
+                  {/* passing reference line */}
+                  <line x1={PPAD.l} x2={PW - PPAD.r} y1={py(passing)} y2={py(passing)}
+                    stroke="#E8E2D6" strokeWidth={1} />
+                  <text x={PPAD.l + 4} y={py(passing) - 5} fontSize={10} fill="#8A94A0" fontWeight={600}>
+                    pass {passing}%
                   </text>
-                ))}
-                {perfArea && <path d={perfArea} fill="rgba(15,163,160,0.10)" />}
-                <path d={perfPath} fill="none" stroke="#0FA3A0" strokeWidth={2}
-                  strokeLinejoin="round" strokeLinecap="round" />
-                {perf.map((p, i) => (
-                  <circle key={p.id} cx={px(i)} cy={py(p.mean)} r={4.5} fill="#0FA3A0"
-                    stroke="#FFFFFF" strokeWidth={2}>
-                    <title>{p.name + " · " + p.mean.toFixed(0) + "% mean · " + p.period + " · " + fmtDate(p.date)}</title>
-                  </circle>
-                ))}
-                {perfLast && (
-                  <text x={px(perf.length - 1) + 9} y={py(perfLast.mean) + 4} fontSize={12}
-                    fontWeight={700} fill="#22303C">
-                    {perfLast.mean.toFixed(0)}%
-                  </text>
+                  {[0, 50, 100].map((v) => (
+                    <text key={v} x={PPAD.l - 6} y={py(v) + 3.5} fontSize={10} fill="#B3BAC2" textAnchor="end">
+                      {v}
+                    </text>
+                  ))}
+                  {perfArea && <path d={perfArea} fill="rgba(15,163,160,0.10)" />}
+                  <path d={perfPath} fill="none" stroke="#0FA3A0" strokeWidth={2}
+                    strokeLinejoin="round" strokeLinecap="round" />
+                  {perf.map((p, i) => (
+                    <g key={p.id}>
+                      {perfHover === i && (
+                        <line x1={px(i)} x2={px(i)} y1={PPAD.t} y2={PH - PPAD.b}
+                          stroke="#D9D3C7" strokeWidth={1} />
+                      )}
+                      <circle cx={px(i)} cy={py(p.mean)} r={perfHover === i ? 5.5 : 4.5}
+                        fill={p.mean >= passing ? "#0FA3A0" : "#D14B33"}
+                        stroke="#FFFFFF" strokeWidth={2} />
+                      {/* generous invisible hit target for hover */}
+                      <circle cx={px(i)} cy={py(p.mean)} r={13} fill="transparent"
+                        onMouseEnter={() => setPerfHover(i)}
+                        onClick={() => go("assessments", { asmId: p.id })}
+                        style={{ cursor: "pointer" }} />
+                    </g>
+                  ))}
+                  {perfLast && perfHover === null && (
+                    <text x={px(perf.length - 1) + 9} y={py(perfLast.mean) + 4} fontSize={12}
+                      fontWeight={700} fill="#22303C">
+                      {perfLast.mean.toFixed(0)}%
+                    </text>
+                  )}
+                  {perfTickIdx.map((i) => (
+                    <text key={i} x={px(i)} y={PH - 6} fontSize={10} fill="#8A94A0" textAnchor="middle">
+                      {fmtDate(perf[i].date)}
+                    </text>
+                  ))}
+                </svg>
+                {perfHover !== null && perf[perfHover] && (
+                  <div
+                    className="pointer-events-none absolute z-10 w-max max-w-[240px] rounded-xl bg-[#101D26] px-3 py-2 text-canvas"
+                    style={{
+                      left: `calc(${(px(perfHover) / PW) * 100}% ${perfHover > perf.length / 2 ? "- 8px" : "+ 8px"})`,
+                      top: `${(py(perf[perfHover].mean) / PH) * 100}%`,
+                      transform:
+                        perfHover > perf.length / 2 ? "translate(-100%, -110%)" : "translate(0, -110%)",
+                      boxShadow: "0 12px 32px rgba(16,29,38,0.35)",
+                    }}
+                  >
+                    <div className="text-[13px] font-bold">{perf[perfHover].name}</div>
+                    <div className="mt-0.5 text-xs text-[#B7C0C8]">
+                      {perf[perfHover].mean.toFixed(0)}% mean · {perf[perfHover].passRate}% passed
+                    </div>
+                    <div className="text-xs text-[#B7C0C8]">
+                      {perf[perfHover].period} · {fmtDate(perf[perfHover].date)} ·{" "}
+                      {perf[perfHover].graded} graded
+                    </div>
+                  </div>
                 )}
-                {perfTickIdx.map((i) => (
-                  <text key={i} x={px(i)} y={PH - 6} fontSize={10} fill="#8A94A0" textAnchor="middle">
-                    {fmtDate(perf[i].date)}
-                  </text>
-                ))}
-              </svg>
-            )}
-          </div>
-        </div>
-
-        {/* Needs attention */}
-        <div className="flex flex-col gap-2.5">
-          <div className="flex items-baseline justify-between px-0.5">
-            <div className="font-display text-[17px] font-extrabold">
-              Needs attention{" "}
-              <span className="font-body text-sm font-semibold text-sub">
-                · {watch.length} of {roster.length}
-              </span>
-            </div>
-            <button
-              onClick={() => go("students")}
-              className="cursor-pointer text-[13px] font-bold text-teal-text"
-            >
-              All students →
-            </button>
-          </div>
-          <div className="max-h-[340px] overflow-y-auto rounded-2xl bg-card pb-1.5 shadow-card">
-            {watch.length === 0 && (
-              <div className="px-[18px] py-6 text-center text-[13px] text-faint">
-                Everyone is passing in {period}.
               </div>
             )}
-            {watch.map((s) => (
-              <button
-                key={s.id}
-                onClick={() => go("students", { student: s.id, remarkDraft: null })}
-                className="flex w-full cursor-pointer items-center justify-between gap-2.5 border-b border-hairline bg-card px-[18px] py-2.5 text-left text-ink hover:bg-canvas"
-              >
-                <div className="min-w-0">
-                  <div className="text-sm font-semibold">{s.name}</div>
-                  <div className="mt-0.5 text-xs leading-[1.4] text-sub">{s.why}</div>
-                </div>
-                <span
-                  className="whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-bold"
-                  style={{ background: s.bg, color: s.color }}
-                >
-                  {s.chip}
-                </span>
-              </button>
-            ))}
           </div>
         </div>
 
@@ -560,12 +669,15 @@ export default function OverviewPage({ params }: { params: Promise<{ clsId: stri
                 </div>
               ))}
             </div>
-            <div className="flex justify-between text-xs font-medium text-sub">
+            <div className="flex flex-wrap justify-between gap-x-3 gap-y-1 text-xs font-medium text-sub">
               <span>
                 Class average <b className="text-ink">{classAvg}</b>
               </span>
               <span>
                 Median <b className="text-ink">{classMedian}</b>
+              </span>
+              <span title="Standard deviation — how spread out the class is. A big σ means very mixed mastery; consider grouping or differentiated review.">
+                Spread σ <b className="text-ink">{classSigma}</b>
               </span>
               <span>
                 Passing at <b className="text-ink">{passingPctText}</b>
@@ -638,54 +750,49 @@ export default function OverviewPage({ params }: { params: Promise<{ clsId: stri
           </div>
         </div>
 
-        {/* Hardest assessments */}
+        <div className="mt-3 flex items-center gap-3 px-0.5 lg:col-span-2">
+          <span className="label-caps whitespace-nowrap text-sub">WHO NEEDS YOU NOW</span>
+          <span className="h-px flex-1 bg-line" />
+        </div>
+
+        {/* Needs attention */}
         <div className="flex flex-col gap-2.5">
           <div className="flex items-baseline justify-between px-0.5">
             <div className="font-display text-[17px] font-extrabold">
-              Hardest assessments · {period}{" "}
+              Needs attention{" "}
               <span className="font-body text-sm font-semibold text-sub">
-                · {asmDiff.length} graded
+                · {watch.length} of {roster.length}
               </span>
             </div>
             <button
-              onClick={() => go("assessments")}
+              onClick={() => go("students")}
               className="cursor-pointer text-[13px] font-bold text-teal-text"
             >
-              All →
+              All students →
             </button>
           </div>
           <div className="max-h-[340px] overflow-y-auto rounded-2xl bg-card pb-1.5 shadow-card">
-            {asmDiff.length === 0 && (
+            {watch.length === 0 && (
               <div className="px-[18px] py-6 text-center text-[13px] text-faint">
-                No graded assessments in {period} yet.
+                Everyone is passing in {period}.
               </div>
             )}
-            {asmDiff.map((a) => (
+            {watch.map((s) => (
               <button
-                key={a.id}
-                onClick={() => go("assessments", { asmId: a.id })}
-                className="grid h-[52px] w-full cursor-pointer grid-cols-[1fr_64px_72px] items-center gap-3 border-b border-hairline bg-card px-[18px] text-left text-ink hover:bg-canvas"
+                key={s.id}
+                onClick={() => go("students", { student: s.id, remarkDraft: null })}
+                className="flex w-full cursor-pointer items-center justify-between gap-2.5 border-b border-hairline bg-card px-[18px] py-2.5 text-left text-ink hover:bg-canvas"
               >
                 <div className="min-w-0">
-                  <div className="truncate text-sm font-semibold">
-                    {a.name} <span className="font-medium text-sub">/ {a.max}</span>
-                  </div>
-                  <div className="mt-px text-xs text-sub">
-                    {a.compPath} · {a.date}
-                  </div>
+                  <div className="text-sm font-semibold">{s.name}</div>
+                  <div className="mt-0.5 text-xs leading-[1.4] text-sub">{s.why}</div>
                 </div>
-                <div className="text-right">
-                  <div className="text-[13px] font-bold" style={{ color: a.meanColor }}>
-                    {a.mean}
-                  </div>
-                  <div className="text-[11px] font-medium text-sub">mean</div>
-                </div>
-                <div className="text-right">
-                  <div className="text-[13px] font-bold" style={{ color: a.passColor }}>
-                    {a.passRate}
-                  </div>
-                  <div className="text-[11px] font-medium text-sub">passed</div>
-                </div>
+                <span
+                  className="whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-bold"
+                  style={{ background: s.bg, color: s.color }}
+                >
+                  {s.chip}
+                </span>
               </button>
             ))}
           </div>
@@ -775,6 +882,148 @@ export default function OverviewPage({ params }: { params: Promise<{ clsId: stri
           </div>
         </div>
 
+        {/* Missing work */}
+        <div className="flex flex-col gap-2.5">
+          <div className="px-0.5 font-display text-[17px] font-extrabold">
+            Missing work{" "}
+            <span className="font-body text-sm font-semibold text-sub">
+              · {missTotal} missed across the term
+            </span>
+          </div>
+          <div className="max-h-[340px] overflow-y-auto rounded-2xl bg-card pb-1.5 shadow-card">
+            {missRows.length === 0 && (
+              <div className="px-[18px] py-6 text-center text-[13px] text-faint">
+                Nothing marked missed. Scores flagged M in the gradebook collect here.
+              </div>
+            )}
+            {missRows.map((m) => (
+              <button
+                key={m.id}
+                onClick={() => go("students", { student: m.id, remarkDraft: null })}
+                className="flex w-full cursor-pointer items-center justify-between gap-2.5 border-b border-hairline bg-card px-[18px] py-2.5 text-left text-ink hover:bg-canvas"
+              >
+                <div className="min-w-0">
+                  <div className="text-sm font-semibold">{m.name}</div>
+                  <div className="mt-0.5 truncate text-xs text-sub">
+                    {m.names.slice(0, 2).join(", ")}
+                    {m.n > 2 ? " +" + (m.n - 2) + " more" : ""}
+                  </div>
+                </div>
+                <span className="whitespace-nowrap rounded-full bg-[#FBE9E5] px-2.5 py-1 text-xs font-bold text-[#B03A24]">
+                  {m.n} missed
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="mt-3 flex items-center gap-3 px-0.5 lg:col-span-2" title="Item-analysis and early-warning views: D uses Ebel's upper-lower 27% discrimination index; the 90% attendance line is the validated early-warning threshold.">
+          <span className="label-caps whitespace-nowrap text-sub">DIAGNOSTICS</span>
+          <span className="h-px flex-1 bg-line" />
+        </div>
+
+        {/* Hardest assessments */}
+        <div className="flex flex-col gap-2.5">
+          <div className="flex items-baseline justify-between px-0.5">
+            <div className="font-display text-[17px] font-extrabold">
+              Assessment diagnostics · {period}{" "}
+              <span className="font-body text-sm font-semibold text-sub">
+                · hardest first · D = discrimination
+              </span>
+            </div>
+            <button
+              onClick={() => go("assessments")}
+              className="cursor-pointer text-[13px] font-bold text-teal-text"
+            >
+              All →
+            </button>
+          </div>
+          <div className="max-h-[340px] overflow-y-auto rounded-2xl bg-card pb-1.5 shadow-card">
+            {asmDiff.length === 0 && (
+              <div className="px-[18px] py-6 text-center text-[13px] text-faint">
+                No graded assessments in {period} yet.
+              </div>
+            )}
+            {asmDiff.map((a) => (
+              <button
+                key={a.id}
+                onClick={() => go("assessments", { asmId: a.id })}
+                className="grid h-[52px] w-full cursor-pointer grid-cols-[1fr_56px_56px_64px] items-center gap-2.5 border-b border-hairline bg-card px-[18px] text-left text-ink hover:bg-canvas"
+              >
+                <div className="min-w-0">
+                  <div className="truncate text-sm font-semibold">
+                    {a.name} <span className="font-medium text-sub">/ {a.max}</span>
+                  </div>
+                  <div className="mt-px truncate text-xs text-sub">
+                    {a.compPath} · {a.date}
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="text-[13px] font-bold" style={{ color: a.meanColor }}>
+                    {a.mean}
+                  </div>
+                  <div className="text-[11px] font-medium text-sub">mean</div>
+                </div>
+                <div className="text-right">
+                  <div className="text-[13px] font-bold" style={{ color: a.passColor }}>
+                    {a.passRate}
+                  </div>
+                  <div className="text-[11px] font-medium text-sub">passed</div>
+                </div>
+                <div className="text-right" title={a.discTitle}>
+                  <div className="text-[13px] font-bold" style={{ color: a.discColor }}>
+                    {a.disc}
+                  </div>
+                  <div className="text-[11px] font-medium" style={{ color: a.discColor }}>
+                    {a.discLabel}
+                  </div>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Grading backlog */}
+        <div className="flex flex-col gap-2.5">
+          <div className="flex items-baseline justify-between px-0.5">
+            <div className="font-display text-[17px] font-extrabold">
+              Grading backlog{" "}
+              <span className="font-body text-sm font-semibold text-sub">
+                · {backlogTotal} score{backlogTotal === 1 ? "" : "s"} to enter
+              </span>
+            </div>
+            <button
+              onClick={() => go("gradebook")}
+              className="cursor-pointer text-[13px] font-bold text-teal-text"
+            >
+              Gradebook →
+            </button>
+          </div>
+          <div className="max-h-[340px] overflow-y-auto rounded-2xl bg-card pb-1.5 shadow-card">
+            {backlog.length === 0 && (
+              <div className="px-[18px] py-6 text-center text-[13px] text-faint">
+                All caught up — every past-dated assessment is fully scored.
+              </div>
+            )}
+            {backlog.map((a) => (
+              <button
+                key={a.id}
+                onClick={() => go("gradebook", { asmId: a.id, period: a.period })}
+                className="flex w-full cursor-pointer items-center justify-between gap-2.5 border-b border-hairline bg-card px-[18px] py-2.5 text-left text-ink hover:bg-canvas"
+              >
+                <div className="min-w-0">
+                  <div className="truncate text-sm font-semibold">{a.name}</div>
+                  <div className="mt-0.5 text-xs text-sub">
+                    {a.period} · {a.date}
+                  </div>
+                </div>
+                <span className="whitespace-nowrap rounded-full bg-[#FFF6DC] px-2.5 py-1 text-xs font-bold text-[#8A6400]">
+                  {a.n} unscored
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+
         {/* Attendance by session */}
         <div className="flex flex-col gap-2.5">
           <div className="flex items-baseline justify-between px-0.5">
@@ -814,12 +1063,12 @@ export default function OverviewPage({ params }: { params: Promise<{ clsId: stri
                 </div>
                 {absentees.length === 0 ? (
                   <div className="text-xs text-sub">
-                    No one is below 85% attendance. Good sign — attendance problems usually show
-                    up in grades two weeks later.
+                    No one is below 90% attendance — the early-warning line (missing more than
+                    10% of class time predicts course failure).
                   </div>
                 ) : (
                   <div className="flex flex-col">
-                    <div className="label-caps mb-1 text-sub">BELOW 85%</div>
+                    <div className="label-caps mb-1 text-sub" title="Missing more than 10% of class time — the validated early-warning threshold.">BELOW 90% · EARLY-WARNING LINE</div>
                     {absentees.map((a) => (
                       <button
                         key={a.id}
@@ -839,40 +1088,49 @@ export default function OverviewPage({ params }: { params: Promise<{ clsId: stri
           </div>
         </div>
 
-        {/* Missing work */}
+        {/* Attendance × grade quadrant (ABC early-warning view) */}
         <div className="flex flex-col gap-2.5">
           <div className="px-0.5 font-display text-[17px] font-extrabold">
-            Missing work{" "}
+            Attendance × grade{" "}
             <span className="font-body text-sm font-semibold text-sub">
-              · {missTotal} missed across the term
+              · who to pull aside, and why
             </span>
           </div>
-          <div className="max-h-[340px] overflow-y-auto rounded-2xl bg-card pb-1.5 shadow-card">
-            {missRows.length === 0 && (
-              <div className="px-[18px] py-6 text-center text-[13px] text-faint">
-                Nothing marked missed. Scores flagged M in the gradebook collect here.
+          <div className="flex flex-col gap-2 rounded-2xl bg-card px-[18px] py-4 shadow-card">
+            {quad.length === 0 ? (
+              <div className="py-4 text-center text-[13px] text-faint">
+                Appears once grades and sessions are recorded.
               </div>
-            )}
-            {missRows.map((m) => (
-              <button
-                key={m.id}
-                onClick={() => go("students", { student: m.id, remarkDraft: null })}
-                className="flex w-full cursor-pointer items-center justify-between gap-2.5 border-b border-hairline bg-card px-[18px] py-2.5 text-left text-ink hover:bg-canvas"
-              >
-                <div className="min-w-0">
-                  <div className="text-sm font-semibold">{m.name}</div>
-                  <div className="mt-0.5 truncate text-xs text-sub">
-                    {m.names.slice(0, 2).join(", ")}
-                    {m.n > 2 ? " +" + (m.n - 2) + " more" : ""}
-                  </div>
+            ) : (
+              <>
+                <svg viewBox={`0 0 ${QW} ${QH}`} className="block h-auto w-full" role="img"
+                  aria-label="Scatter of each student by attendance rate and current grade, split at the 90% attendance early-warning line and the passing mark">
+                  <line x1={qx(90)} x2={qx(90)} y1={QP.t} y2={QH - QP.b} stroke="#E8E2D6" strokeWidth={1} />
+                  <line x1={QP.l} x2={QW - QP.r} y1={qy(passing)} y2={qy(passing)} stroke="#E8E2D6" strokeWidth={1} />
+                  <text x={QP.l + 3} y={QP.t + 8} fontSize={8} fill="#B3BAC2" fontWeight={700}>ABSENT · PASSING</text>
+                  <text x={QW - QP.r - 3} y={QP.t + 8} fontSize={8} fill="#B3BAC2" fontWeight={700} textAnchor="end">ON TRACK</text>
+                  <text x={QP.l + 3} y={QH - QP.b - 4} fontSize={8} fill="#B3BAC2" fontWeight={700}>DISENGAGED</text>
+                  <text x={QW - QP.r - 3} y={QH - QP.b - 4} fontSize={8} fill="#B3BAC2" fontWeight={700} textAnchor="end">ATTENDS · NEEDS HELP</text>
+                  <text x={qx(90)} y={QH - 4} fontSize={8.5} fill="#8A94A0" textAnchor="middle">90% attendance</text>
+                  <text x={QP.l - 4} y={qy(passing) + 3} fontSize={8.5} fill="#8A94A0" textAnchor="end">pass</text>
+                  {quad.map((q) => (
+                    <g key={q.id} onClick={() => go("students", { student: q.id, remarkDraft: null })} style={{ cursor: "pointer" }}>
+                      <circle cx={qx(q.att)} cy={qy(q.pct)} r={5} fill={q.color} stroke="#FFFFFF" strokeWidth={2}>
+                        <title>{q.name + " · attendance " + q.att + "% · grade " + q.pct.toFixed(1) + "%"}</title>
+                      </circle>
+                      <text x={qx(q.att) + 7} y={qy(q.pct) + 3} fontSize={8} fill="#5A6672" fontWeight={600}>{q.initials}</text>
+                    </g>
+                  ))}
+                </svg>
+                <div className="text-xs leading-[1.5] text-sub">
+                  Bottom-right attends but still struggles — that&apos;s a learning gap; coach the
+                  subject. Bottom-left is disengaging — involve the guardian early.
                 </div>
-                <span className="whitespace-nowrap rounded-full bg-[#FBE9E5] px-2.5 py-1 text-xs font-bold text-[#B03A24]">
-                  {m.n} missed
-                </span>
-              </button>
-            ))}
+              </>
+            )}
           </div>
         </div>
+
       </div>
     </>
   );

@@ -22,10 +22,21 @@ export const provider = () => (PAYMONGO_KEY() ? "paymongo" : "mock");
 
 const appUrl = () => process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
 
-/** ULAT-<year>-<seq>, assigned when the payment row is created. */
+/**
+ * ULAT-<year>-<seq>, assigned when the payment row is created. Derived from
+ * the highest existing number, never from a count: deleting a payment row
+ * (e.g. an account deletion cascade) must not make the sequence re-issue a
+ * taken number, which would fail the unique constraint on every checkout.
+ * Zero-padded numbers keep string DESC ordering correct up to 9999/year.
+ */
 async function nextInvoiceNo() {
   const year = new Date().getFullYear();
-  const n = await prisma.payment.count({ where: { no: { startsWith: `ULAT-${year}-` } } });
+  const last = await prisma.payment.findFirst({
+    where: { no: { startsWith: `ULAT-${year}-` } },
+    orderBy: { no: "desc" },
+    select: { no: true },
+  });
+  const n = last ? Number(last.no.slice(`ULAT-${year}-`.length)) || 0 : 0;
   return `ULAT-${year}-${String(n + 1).padStart(4, "0")}`;
 }
 
@@ -42,20 +53,30 @@ export async function createCheckout(user: User, cycle: Cycle, method: string) {
   const credit = Math.min(user.creditCents, gross);
   const net = gross - credit;
 
-  const payment = await prisma.payment.create({
-    data: {
-      userId: user.id,
-      no: await nextInvoiceNo(),
-      provider: net === 0 ? "credit" : provider(),
-      providerRef: "ref_" + randomBytes(12).toString("hex"),
-      method,
-      cycle,
-      grossCents: gross,
-      creditCents: credit,
-      netCents: net,
-      desc: `Pro · ${cycle === "Annual" ? "Yearly" : "Monthly"} · ${method}`,
-    },
-  });
+  // Two concurrent checkouts can race to the same invoice number; the unique
+  // constraint catches it and a fresh number is drawn.
+  let payment: Payment | null = null;
+  for (let attempt = 0; !payment; attempt++) {
+    try {
+      payment = await prisma.payment.create({
+        data: {
+          userId: user.id,
+          no: await nextInvoiceNo(),
+          provider: net === 0 ? "credit" : provider(),
+          providerRef: "ref_" + randomBytes(12).toString("hex"),
+          method,
+          cycle,
+          grossCents: gross,
+          creditCents: credit,
+          netCents: net,
+          desc: `Pro · ${cycle === "Annual" ? "Yearly" : "Monthly"} · ${method}`,
+        },
+      });
+    } catch (e) {
+      const dup = (e as { code?: string })?.code === "P2002";
+      if (!dup || attempt >= 3) throw e;
+    }
+  }
 
   // Fully covered by referral credit: no provider round-trip needed.
   if (net === 0) {
