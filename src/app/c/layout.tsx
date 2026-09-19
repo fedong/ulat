@@ -55,6 +55,16 @@ export default function ClassLayout({ children }: { children: React.ReactNode })
       return !v;
     });
 
+  // Below md the sidebar lives in a slide-out drawer behind the hamburger.
+  const [drawer, setDrawer] = useState(false);
+  useEffect(() => setDrawer(false), [pathname]);
+  useEffect(() => {
+    if (!drawer) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setDrawer(false);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [drawer]);
+
   // One-time phone nudge: the web app is desktop-first; on a phone-sized
   // screen suggest the mobile app once, then stay quiet after dismissal.
   const [phoneTip, setPhoneTip] = useState(false);
@@ -196,7 +206,7 @@ export default function ClassLayout({ children }: { children: React.ReactNode })
   return (
     <div
       ref={shellRef}
-      className="relative grid h-dvh grid-cols-[240px_minmax(0,1fr)] overflow-hidden bg-canvas"
+      className="relative grid h-dvh grid-cols-1 overflow-hidden bg-canvas md:grid-cols-[240px_minmax(0,1fr)]"
     >
       <ConfirmDialogHost />
       <TourOverlay clsId={cls.id} shellRef={shellRef} />
@@ -226,8 +236,22 @@ export default function ClassLayout({ children }: { children: React.ReactNode })
         </div>
       )}
 
-      {/* Sidebar */}
-      <div className="bg-panel-v3 flex min-h-0 flex-col overflow-y-auto border-r border-white/5 px-4 py-6 text-canvas">
+      {/* Drawer scrim (phones only) */}
+      {drawer && (
+        <div
+          className="fixed inset-0 z-50 bg-black/40 md:hidden"
+          onClick={() => setDrawer(false)}
+          aria-hidden
+        />
+      )}
+
+      {/* Sidebar: fixed drawer below md, static column from md up */}
+      <div
+        className={`bg-panel-v3 min-h-0 flex-col overflow-y-auto border-r border-white/5 px-4 py-6 text-canvas ${
+          drawer ? "fixed inset-y-0 left-0 z-[60] flex w-[270px] shadow-2xl" : "hidden"
+        } md:static md:z-auto md:flex md:w-auto md:shadow-none`}
+        style={drawer ? { animation: "ulatIn .2s ease both" } : undefined}
+      >
         <div className="flex h-[34px] items-center px-2">
           <AnimatedLogo size={30} />
         </div>
@@ -318,8 +342,20 @@ export default function ClassLayout({ children }: { children: React.ReactNode })
       {/* Main column */}
       <div className="flex min-h-0 min-w-0 flex-col overflow-hidden">
         {hdrMin && !st.tour ? (
-          <div className="header-frost flex flex-shrink-0 items-center justify-between gap-4 px-8 py-2">
-            <div className="min-w-0 truncate text-[13px] font-bold text-ink">{headerTitle}</div>
+          <div className="header-frost flex flex-shrink-0 items-center justify-between gap-4 px-5 py-2 md:px-8">
+            <div className="flex min-w-0 items-center gap-2">
+              <button
+                onClick={() => setDrawer(true)}
+                title={L("Open menu", "Buksan ang menu")}
+                aria-label={L("Open menu", "Buksan ang menu")}
+                className="-ml-1 flex h-8 w-8 flex-shrink-0 cursor-pointer items-center justify-center rounded-lg text-sub hover:bg-black/[0.05] hover:text-ink md:hidden"
+              >
+                <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" aria-hidden>
+                  <line x1={4} y1={6} x2={20} y2={6} /><line x1={4} y1={12} x2={20} y2={12} /><line x1={4} y1={18} x2={20} y2={18} />
+                </svg>
+              </button>
+              <div className="min-w-0 truncate text-[13px] font-bold text-ink">{headerTitle}</div>
+            </div>
             <div className="flex flex-shrink-0 items-center gap-3">
               {!onAccountPage && (
                 <span
@@ -350,12 +386,24 @@ export default function ClassLayout({ children }: { children: React.ReactNode })
             </div>
           </div>
         ) : (
-        <div className="header-frost flex flex-shrink-0 items-center justify-between gap-6 px-8 py-[22px]">
-          <div className="min-w-0">
-            <div className="title-gradient truncate font-display text-[22px] font-extrabold tracking-[-0.4px]">
-              {headerTitle}
+        <div className="header-frost flex flex-shrink-0 items-center justify-between gap-6 px-5 py-[22px] md:px-8">
+          <div className="flex min-w-0 items-center gap-2.5">
+            <button
+              onClick={() => setDrawer(true)}
+              title={L("Open menu", "Buksan ang menu")}
+              aria-label={L("Open menu", "Buksan ang menu")}
+              className="-ml-1 flex h-9 w-9 flex-shrink-0 cursor-pointer items-center justify-center rounded-lg text-sub hover:bg-black/[0.05] hover:text-ink md:hidden"
+            >
+              <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" aria-hidden>
+                <line x1={4} y1={6} x2={20} y2={6} /><line x1={4} y1={12} x2={20} y2={12} /><line x1={4} y1={18} x2={20} y2={18} />
+              </svg>
+            </button>
+            <div className="min-w-0">
+              <div className="title-gradient truncate font-display text-[22px] font-extrabold tracking-[-0.4px]">
+                {headerTitle}
+              </div>
+              <div className="mt-[3px] truncate text-[13px] font-medium text-sub">{headerSub}</div>
             </div>
-            <div className="mt-[3px] truncate text-[13px] font-medium text-sub">{headerSub}</div>
           </div>
           {!onAccountPage && (
           <div className="flex flex-shrink-0 items-center gap-2.5">
@@ -386,7 +434,9 @@ export default function ClassLayout({ children }: { children: React.ReactNode })
                     : L("Saving…", "Sine-save…")}
               </span>
             </span>
-            <ExportMenu clsId={cls.id} />
+            <div className="hidden sm:block">
+              <ExportMenu clsId={cls.id} />
+            </div>
             <button
               data-tour="add-asm"
               onClick={() => router.push(`/c/${cls.id}/assessments`)}
@@ -414,7 +464,7 @@ export default function ClassLayout({ children }: { children: React.ReactNode })
         {/* Keyed by pathname so every page change gets the same soft entrance. */}
         <div
           key={pathname}
-          className="bg-content-v3 flex min-h-0 flex-1 flex-col px-8 pb-7 pt-6"
+          className="bg-content-v3 flex min-h-0 flex-1 flex-col px-4 pb-7 pt-6 md:px-8"
           style={{ animation: "ulatIn .3s ease both" }}
         >
           {children}
