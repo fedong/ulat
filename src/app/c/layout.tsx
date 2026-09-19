@@ -55,6 +55,22 @@ export default function ClassLayout({ children }: { children: React.ReactNode })
       return !v;
     });
 
+  // One-time phone nudge: the web app is desktop-first; on a phone-sized
+  // screen suggest the mobile app once, then stay quiet after dismissal.
+  const [phoneTip, setPhoneTip] = useState(false);
+  useEffect(() => {
+    try {
+      if (localStorage.getItem("ulat_phone_tip") === "1") return;
+      if (window.matchMedia("(max-width: 639px)").matches) setPhoneTip(true);
+    } catch {}
+  }, []);
+  const dismissPhoneTip = () => {
+    setPhoneTip(false);
+    try {
+      localStorage.setItem("ulat_phone_tip", "1");
+    } catch {}
+  };
+
   // Demo-only entitlement override: localStorage.ulat_ent = Trialing | Active |
   // Past due | Grace | Free (stand-in for the prototype's tweaks panel).
   useEffect(() => {
@@ -184,6 +200,31 @@ export default function ClassLayout({ children }: { children: React.ReactNode })
     >
       <ConfirmDialogHost />
       <TourOverlay clsId={cls.id} shellRef={shellRef} />
+
+      {phoneTip && (
+        <div
+          className="fixed inset-x-3 bottom-3 z-40 flex items-center justify-between gap-3 rounded-2xl px-4 py-3 text-canvas"
+          style={{
+            background: "linear-gradient(135deg,#101D26 0%,#16242F 100%)",
+            border: "1px solid rgba(255,255,255,0.08)",
+            boxShadow: "0 16px 40px rgba(16,29,38,0.4)",
+            animation: "ulatIn .3s ease both",
+          }}
+        >
+          <span className="min-w-0 text-[13px] font-medium leading-[1.45]">
+            {L(
+              "On a phone? The Ulat mobile app is built for this screen — grades, attendance and alerts on the go.",
+              "Naka-phone ka? Ang Ulat mobile app ay ginawa para sa screen na ito — marka, attendance at alerto kahit saan.",
+            )}
+          </span>
+          <button
+            onClick={dismissPhoneTip}
+            className="h-9 flex-shrink-0 cursor-pointer whitespace-nowrap rounded-xl bg-amber px-3.5 text-[13px] font-bold text-ink"
+          >
+            {L("Got it", "Sige")}
+          </button>
+        </div>
+      )}
 
       {/* Sidebar */}
       <div className="bg-panel-v3 flex min-h-0 flex-col overflow-y-auto border-r border-white/5 px-4 py-6 text-canvas">
