@@ -5,6 +5,9 @@
 # Required environment (set in Coolify's env editor, or .env next to this
 # file): POSTGRES_PASSWORD, JWT_SECRET, NEXT_PUBLIC_APP_URL.
 # Optional: PAYMONGO_SECRET_KEY, PAYMONGO_WEBHOOK_SECRET, SEED_DEMO=1.
+# Backups (the pg_dump-to-S3 sidecar starts once these are set):
+# BACKUP_S3_ENDPOINT, BACKUP_S3_ACCESS_KEY_ID, BACKUP_S3_SECRET_ACCESS_KEY,
+# and optionally BACKUP_S3_BUCKET (default ulat-backups).
 
 services:
   db:
@@ -41,6 +44,30 @@ services:
       SEED_DEMO: ${SEED_DEMO:-0}
     ports:
       - "${APP_PORT:-3000}:3000"
+
+  # Grade backups: pg_dump every 6 hours, uploaded to S3-compatible storage
+  # (Cloudflare R2), pruned after 14 days. Without the BACKUP_S3_* env vars
+  # this container exits and retries — db/app are unaffected — so a local
+  # rehearsal without R2 credentials can just run `docker compose up db app`.
+  backup:
+    image: eeshugerman/postgres-backup-s3:16
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      SCHEDULE: "@every 6h"
+      BACKUP_KEEP_DAYS: "14"
+      POSTGRES_HOST: db
+      POSTGRES_DATABASE: ulat
+      POSTGRES_USER: ulat
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      S3_REGION: auto
+      S3_ENDPOINT: ${BACKUP_S3_ENDPOINT:-}
+      S3_BUCKET: ${BACKUP_S3_BUCKET:-ulat-backups}
+      S3_PREFIX: pg
+      S3_ACCESS_KEY_ID: ${BACKUP_S3_ACCESS_KEY_ID:-}
+      S3_SECRET_ACCESS_KEY: ${BACKUP_S3_SECRET_ACCESS_KEY:-}
 
 volumes:
   ulat-pgdata:

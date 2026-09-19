@@ -43,6 +43,10 @@ Then, whichever box:
    | `PAYMONGO_WEBHOOK_SECRET` | from the PayMongo webhook you create in step 5 |
    | `SEED_DEMO` | `1` on the first deploy if you want the demo accounts, else `0` |
    | `APP_PORT` | leave default; Coolify's proxy targets the service port `3000` |
+   | `BACKUP_S3_ENDPOINT` | R2/S3 endpoint, e.g. `https://<account-id>.r2.cloudflarestorage.com` |
+   | `BACKUP_S3_ACCESS_KEY_ID` | R2 API token's Access Key ID (Object Read & Write, bucket-scoped) |
+   | `BACKUP_S3_SECRET_ACCESS_KEY` | R2 API token's Secret Access Key |
+   | `BACKUP_S3_BUCKET` | optional; defaults to `ulat-backups` |
 
 3. Deploy. Boot order is automatic: Postgres healthcheck → app container runs
    `prisma migrate deploy` (retrying while the DB comes up) → optional demo
@@ -60,14 +64,22 @@ Then, whichever box:
 
 ## 4 · Backups (grades must not lose a day)
 
-- **Coolify scheduled database backup** on the Postgres service: `pg_dump`
-  every 6 hours, retention ≥ 14 days, destination an S3-compatible bucket —
-  **Cloudflare R2** (free tier covers this comfortably).
+- **The `backup` service in `docker-compose.yml` does this automatically**:
+  `pg_dump` every 6 hours uploaded to the R2 bucket under `pg/`, pruned
+  after 14 days. It starts working as soon as the three `BACKUP_S3_*` env
+  vars from §2 are set (R2's free 10 GB tier covers this comfortably).
+  Without them the container idles in a retry loop and db/app are
+  unaffected. Trigger an immediate dump any time:
+  `docker compose exec backup sh backup.sh`.
 - **Provider snapshots** of the whole VPS: enable the host's auto-backups as
   the disaster-recovery layer. Snapshots alone are not the grade backup —
   the 6-hour dumps are.
-- Restore drill (do this once before launch): fresh Postgres container →
-  `pg_restore` the newest dump → point a staging app at it → sign in.
+- Restore drill (do this once before launch): download the newest dump from
+  R2 → `pg_restore` into a scratch Postgres container → check the row
+  counts, e.g.
+  `docker run -d --name drill -e POSTGRES_PASSWORD=x postgres:16-alpine`,
+  `pg_restore -h ... -d postgres --create backup.dump`, then
+  `SELECT count(*) FROM "User";`.
 
 ## 5 · PayMongo go-live
 
